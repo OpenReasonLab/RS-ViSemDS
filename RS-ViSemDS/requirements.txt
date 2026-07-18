@@ -1,0 +1,9 @@
+# Install the parent project's requirements first.
+numpy
+Pillow
+torch
+torchvision
+transformers
+open_clip_torch
+huggingface_hub
+
