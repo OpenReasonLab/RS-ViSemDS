@@ -1,0 +1,15 @@
+{
+  "dataset": "nwpu_fg_urban",
+  "classes": [
+    "dense_residential",
+    "medium_residential",
+    "sparse_residential",
+    "mobile_home_park",
+    "commercial_area",
+    "industrial_area",
+    "parking_lot",
+    "railway_station"
+  ],
+  "max_shot": 10,
+  "expected_images_per_class": 700
+}
