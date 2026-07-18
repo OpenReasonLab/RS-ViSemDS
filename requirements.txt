@@ -1,0 +1,12 @@
+torch
+torchvision
+timm
+pillow
+open_clip_torch
+huggingface_hub
+transformers
+accelerate
+safetensors
+sentencepiece
+protobuf
+scikit-learn
