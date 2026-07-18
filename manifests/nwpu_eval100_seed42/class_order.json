@@ -1,0 +1,12 @@
+{
+  "classes": [
+    "dense_residential",
+    "medium_residential",
+    "sparse_residential",
+    "mobile_home_park",
+    "commercial_area",
+    "industrial_area",
+    "parking_lot",
+    "railway_station"
+  ]
+}

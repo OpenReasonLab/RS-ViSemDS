@@ -1,0 +1,104 @@
+{
+  "dataset": "aid",
+  "data_root": "data_raw/AID_dataset",
+  "requested_data_root": "data_raw/AID_dataset",
+  "split_mode": "fixed_per_class",
+  "eval_per_class": 100,
+  "eval_ratio": null,
+  "evaluation_role": "fixed_evaluation",
+  "seed": 42,
+  "classes": [
+    "Airport",
+    "BareLand",
+    "BaseballField",
+    "Beach",
+    "Bridge",
+    "Center",
+    "Church",
+    "Commercial",
+    "DenseResidential",
+    "Desert"
+  ],
+  "class_counts": {
+    "Airport": {
+      "source_directory": "Airport",
+      "total": 360,
+      "evaluation": 100,
+      "support": 260,
+      "validation_ratio": 0.2777777777777778,
+      "training_ratio": 0.7222222222222222
+    },
+    "BareLand": {
+      "source_directory": "BareLand",
+      "total": 310,
+      "evaluation": 100,
+      "support": 210,
+      "validation_ratio": 0.3225806451612903,
+      "training_ratio": 0.6774193548387096
+    },
+    "BaseballField": {
+      "source_directory": "BaseballField",
+      "total": 220,
+      "evaluation": 100,
+      "support": 120,
+      "validation_ratio": 0.45454545454545453,
+      "training_ratio": 0.5454545454545454
+    },
+    "Beach": {
+      "source_directory": "Beach",
+      "total": 400,
+      "evaluation": 100,
+      "support": 300,
+      "validation_ratio": 0.25,
+      "training_ratio": 0.75
+    },
+    "Bridge": {
+      "source_directory": "Bridge",
+      "total": 360,
+      "evaluation": 100,
+      "support": 260,
+      "validation_ratio": 0.2777777777777778,
+      "training_ratio": 0.7222222222222222
+    },
+    "Center": {
+      "source_directory": "Center",
+      "total": 260,
+      "evaluation": 100,
+      "support": 160,
+      "validation_ratio": 0.38461538461538464,
+      "training_ratio": 0.6153846153846154
+    },
+    "Church": {
+      "source_directory": "Church",
+      "total": 240,
+      "evaluation": 100,
+      "support": 140,
+      "validation_ratio": 0.4166666666666667,
+      "training_ratio": 0.5833333333333334
+    },
+    "Commercial": {
+      "source_directory": "Commercial",
+      "total": 350,
+      "evaluation": 100,
+      "support": 250,
+      "validation_ratio": 0.2857142857142857,
+      "training_ratio": 0.7142857142857143
+    },
+    "DenseResidential": {
+      "source_directory": "DenseResidential",
+      "total": 410,
+      "evaluation": 100,
+      "support": 310,
+      "validation_ratio": 0.24390243902439024,
+      "training_ratio": 0.7560975609756098
+    },
+    "Desert": {
+      "source_directory": "Desert",
+      "total": 300,
+      "evaluation": 100,
+      "support": 200,
+      "validation_ratio": 0.3333333333333333,
+      "training_ratio": 0.6666666666666666
+    }
+  }
+}

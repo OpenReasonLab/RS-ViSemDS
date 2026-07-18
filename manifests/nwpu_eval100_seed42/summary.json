@@ -1,0 +1,86 @@
+{
+  "dataset": "nwpu_fg_urban",
+  "data_root": "data_raw/NWPU-RESISC45",
+  "requested_data_root": "data_raw/NWPU-RESISC45",
+  "split_mode": "fixed_per_class",
+  "eval_per_class": 100,
+  "eval_ratio": null,
+  "evaluation_role": "fixed_evaluation",
+  "seed": 42,
+  "classes": [
+    "dense_residential",
+    "medium_residential",
+    "sparse_residential",
+    "mobile_home_park",
+    "commercial_area",
+    "industrial_area",
+    "parking_lot",
+    "railway_station"
+  ],
+  "class_counts": {
+    "dense_residential": {
+      "source_directory": "dense_residential",
+      "total": 700,
+      "evaluation": 100,
+      "support": 600,
+      "validation_ratio": 0.14285714285714285,
+      "training_ratio": 0.8571428571428571
+    },
+    "medium_residential": {
+      "source_directory": "medium_residential",
+      "total": 700,
+      "evaluation": 100,
+      "support": 600,
+      "validation_ratio": 0.14285714285714285,
+      "training_ratio": 0.8571428571428571
+    },
+    "sparse_residential": {
+      "source_directory": "sparse_residential",
+      "total": 700,
+      "evaluation": 100,
+      "support": 600,
+      "validation_ratio": 0.14285714285714285,
+      "training_ratio": 0.8571428571428571
+    },
+    "mobile_home_park": {
+      "source_directory": "mobile_home_park",
+      "total": 700,
+      "evaluation": 100,
+      "support": 600,
+      "validation_ratio": 0.14285714285714285,
+      "training_ratio": 0.8571428571428571
+    },
+    "commercial_area": {
+      "source_directory": "commercial_area",
+      "total": 700,
+      "evaluation": 100,
+      "support": 600,
+      "validation_ratio": 0.14285714285714285,
+      "training_ratio": 0.8571428571428571
+    },
+    "industrial_area": {
+      "source_directory": "industrial_area",
+      "total": 700,
+      "evaluation": 100,
+      "support": 600,
+      "validation_ratio": 0.14285714285714285,
+      "training_ratio": 0.8571428571428571
+    },
+    "parking_lot": {
+      "source_directory": "parking_lot",
+      "total": 700,
+      "evaluation": 100,
+      "support": 600,
+      "validation_ratio": 0.14285714285714285,
+      "training_ratio": 0.8571428571428571
+    },
+    "railway_station": {
+      "source_directory": "railway_station",
+      "total": 700,
+      "evaluation": 100,
+      "support": 600,
+      "validation_ratio": 0.14285714285714285,
+      "training_ratio": 0.8571428571428571
+    }
+  }
+}
