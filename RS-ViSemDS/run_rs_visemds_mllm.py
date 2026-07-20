@@ -59,8 +59,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-tokens", type=int, default=256)
     parser.add_argument("--min-pixels", type=int, default=None)
     parser.add_argument("--max-pixels", type=int, default=None)
-    parser.add_argument("--invalid-retries", type=int, default=1)
-    parser.add_argument("--prompt-mode", choices=PROMPT_MODES, default="legacy")
+    parser.add_argument("--invalid-retries", type=int, default=0)
+    parser.add_argument("--prompt-mode", choices=PROMPT_MODES, default="manuscript_v1")
     parser.add_argument(
         "--target-classes",
         nargs="+",

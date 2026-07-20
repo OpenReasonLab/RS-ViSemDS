@@ -43,9 +43,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--remoteclip-checkpoint", default="")
     parser.add_argument("--r", type=int, default=3)
     parser.add_argument("--k", type=int, default=3)
-    parser.add_argument("--alpha", type=float, default=1 / 3)
-    parser.add_argument("--beta", type=float, default=1 / 3)
-    parser.add_argument("--gamma", type=float, default=1 / 3)
+    parser.add_argument("--alpha", type=float, default=0.6)
+    parser.add_argument("--beta", type=float, default=0.2)
+    parser.add_argument("--gamma", type=float, default=0.2)
     parser.add_argument("--eps", type=float, default=1e-8)
     parser.add_argument("--feature-batch-size", type=int, default=64)
     parser.add_argument("--feature-num-workers", type=int, default=0)
@@ -56,6 +56,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    weights = (args.alpha, args.beta, args.gamma)
+    if any(value < 0 for value in weights) or abs(sum(weights) - 1.0) > 1e-6:
+        raise ValueError("alpha, beta, and gamma must be non-negative and sum to 1")
     manifest_dir = repo_path(args.manifest_dir, PROJECT_ROOT)
     out_dir = repo_path(args.out_dir, PROJECT_ROOT)
     cache_dir = repo_path(args.cache_dir, PROJECT_ROOT)

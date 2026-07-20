@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/root/autodl-tmp/remote_sensing_project/strict_fewshot_baselines}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 PYTHON_BIN="${PYTHON_BIN:-/root/miniconda3/bin/python}"
 MODEL_PATH="${INTERNVL35_14B_MODEL:-/root/autodl-tmp/models/InternVL3.5-14B}"
-REMOTECLIP_CHECKPOINT="${REMOTECLIP_CHECKPOINT:-$PROJECT_ROOT/RemoteCLIP/models--chendelong--RemoteCLIP/snapshots/bf1d8a3ccf2ddbf7c875705e46373bfe542bce38/RemoteCLIP-ViT-B-32.pt}"
+REMOTECLIP_CHECKPOINT="${REMOTECLIP_CHECKPOINT:-$PROJECT_ROOT/checkpoints/RemoteCLIP-ViT-B-32.pt}"
 RUN_ROOT="RS-ViSemDS/ablations/aid_three_classes/v3_weight_602020_reference_prompt"
 SELECTION_DIR="$RUN_ROOT/selection"
 RESULT_DIR="$RUN_ROOT/results_internvl35_14b"
 
+cd "$PROJECT_ROOT"
 test -x "$PYTHON_BIN"
 test -d "$MODEL_PATH"
 test -f "$REMOTECLIP_CHECKPOINT"
-cd "$PROJECT_ROOT"
 
 echo "V3: alpha=0.6 beta=0.2 gamma=0.2; prompt=reference_guided_v1"
 nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv,noheader

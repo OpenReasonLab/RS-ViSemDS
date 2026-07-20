@@ -2,10 +2,11 @@
 set -euo pipefail
 
 MODE="${1:-full}"
-PROJECT_ROOT="${PROJECT_ROOT:-/root/autodl-tmp/remote_sensing_project/strict_fewshot_baselines}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 PYTHON_BIN="${PYTHON_BIN:-/root/miniconda3/bin/python}"
 MODEL_PATH="${INTERNVL35_14B_MODEL:-/root/autodl-tmp/models/InternVL3.5-14B}"
-REMOTECLIP_CHECKPOINT="${REMOTECLIP_CHECKPOINT:-$PROJECT_ROOT/RemoteCLIP/models--chendelong--RemoteCLIP/snapshots/bf1d8a3ccf2ddbf7c875705e46373bfe542bce38/RemoteCLIP-ViT-B-32.pt}"
+REMOTECLIP_CHECKPOINT="${REMOTECLIP_CHECKPOINT:-$PROJECT_ROOT/checkpoints/RemoteCLIP-ViT-B-32.pt}"
 
 case "$MODE" in
   smoke)
@@ -23,10 +24,10 @@ case "$MODE" in
     ;;
 esac
 
+cd "$PROJECT_ROOT"
 test -x "$PYTHON_BIN"
 test -d "$MODEL_PATH"
 test -f "$REMOTECLIP_CHECKPOINT"
-cd "$PROJECT_ROOT"
 
 echo "mode=$MODE"
 echo "project=$PROJECT_ROOT"
@@ -39,6 +40,10 @@ exec "$PYTHON_BIN" RS-ViSemDS/run_rs_visemds_all.py \
   --model-path "internvl35_14b=$MODEL_PATH" \
   --r 3 \
   --k 3 \
+  --alpha 0.6 \
+  --beta 0.2 \
+  --gamma 0.2 \
+  --prompt-mode manuscript_v1 \
   --remoteclip-checkpoint "$REMOTECLIP_CHECKPOINT" \
   --feature-batch-size 64 \
   --feature-num-workers 0 \

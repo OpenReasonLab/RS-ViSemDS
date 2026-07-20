@@ -2,10 +2,11 @@
 set -euo pipefail
 
 MODE="${1:-both}"
-PROJECT_ROOT="${PROJECT_ROOT:-/root/autodl-tmp/remote_sensing_project/strict_fewshot_baselines}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 PYTHON_BIN="${PYTHON_BIN:-/root/miniconda3/bin/python}"
 MODEL_PATH="${INTERNVL35_14B_MODEL:-/root/autodl-tmp/models/InternVL3.5-14B}"
-REMOTECLIP_CHECKPOINT="${REMOTECLIP_CHECKPOINT:-$PROJECT_ROOT/RemoteCLIP/models--chendelong--RemoteCLIP/snapshots/bf1d8a3ccf2ddbf7c875705e46373bfe542bce38/RemoteCLIP-ViT-B-32.pt}"
+REMOTECLIP_CHECKPOINT="${REMOTECLIP_CHECKPOINT:-$PROJECT_ROOT/checkpoints/RemoteCLIP-ViT-B-32.pt}"
 RUN_ROOT="RS-ViSemDS/ablations/nwpu_all/weight_602020"
 SELECTION_DIR="$RUN_ROOT/selection"
 
@@ -17,10 +18,10 @@ case "$MODE" in
     ;;
 esac
 
+cd "$PROJECT_ROOT"
 test -x "$PYTHON_BIN"
 test -d "$MODEL_PATH"
 test -f "$REMOTECLIP_CHECKPOINT"
-cd "$PROJECT_ROOT"
 
 echo "NWPU prompt ablation: alpha=0.6 beta=0.2 gamma=0.2; mode=$MODE"
 nvidia-smi --query-gpu=name,memory.total,memory.free --format=csv,noheader

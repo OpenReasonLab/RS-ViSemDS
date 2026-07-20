@@ -14,11 +14,23 @@ SYSTEM_PROMPT = (
 )
 
 PROMPT_MODES = (
+    "manuscript_v1",
     "legacy",
     "reference_guided_v1",
     "reference_only_v1",
     "reference_fallback_v2",
     "reference_fallback_v3",
+)
+
+MANUSCRIPT_INSTRUCTION = (
+    "The selected labeled images below are the only positive classification evidence. "
+    "Compare the target with the reference examples as complete scenes. Stage A: "
+    "Compare the target with the demonstrations as complete scenes and identify the "
+    "provisional label P and runner-up R. If P is a clear match, return P. Stage B: "
+    "Only if P and R remain ambiguous, apply exactly one P-versus-R exclusion check. "
+    "Keep P unless clear scene-level counterevidence contradicts it and the target "
+    "remains consistent with R. The check cannot positively support a label or "
+    "introduce a third label."
 )
 
 REFERENCE_GUIDED_INSTRUCTION = (
@@ -250,6 +262,14 @@ def task_text(
     if prompt_mode not in PROMPT_MODES:
         raise ValueError(f"Unknown prompt mode: {prompt_mode}")
     labels = ", ".join(class_order)
+    if prompt_mode == "manuscript_v1":
+        return "\n\n".join([
+            "Task Instruction: " + MANUSCRIPT_INSTRUCTION,
+            f"Candidate Label Set: {labels}",
+            "Allowed answer strings must be copied exactly, including capitalization and underscores.",
+            "Boundary-aware Category Rules:\n" + boundary_rule_block(dataset, class_order),
+            f"Visual-Semantic Demonstrations: {example_count} score-ordered labeled image(s) follow.",
+        ])
     if prompt_mode == "reference_fallback_v3":
         return "\n\n".join([
             "Task Instruction: " + REFERENCE_FALLBACK_V3_INSTRUCTION,

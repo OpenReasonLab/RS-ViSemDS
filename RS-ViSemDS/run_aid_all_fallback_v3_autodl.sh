@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/root/autodl-tmp/remote_sensing_project/strict_fewshot_baselines}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 PYTHON_BIN="${PYTHON_BIN:-/root/miniconda3/bin/python}"
 MODEL_PATH="${INTERNVL35_14B_MODEL:-/root/autodl-tmp/models/InternVL3.5-14B}"
 SELECTION_DIR="RS-ViSemDS/ablations/aid_three_classes/v3_weight_602020_reference_prompt/selection"
 RUN_ROOT="RS-ViSemDS/ablations/aid_all/weight_602020_reference_fallback_v3"
 RESULT_DIR="$RUN_ROOT/results_internvl35_14b"
 
+cd "$PROJECT_ROOT"
 test -x "$PYTHON_BIN"
 test -d "$MODEL_PATH"
 test -f "$SELECTION_DIR/examples_rs_visemds_shot_3.csv"
-cd "$PROJECT_ROOT"
 
 echo "AID all classes: alpha=0.6 beta=0.2 gamma=0.2; prompt=reference_fallback_v3"
 echo "Reusing the frozen 1000-target AID selection file."

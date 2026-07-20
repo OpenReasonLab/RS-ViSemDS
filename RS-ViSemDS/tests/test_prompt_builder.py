@@ -15,6 +15,13 @@ from rs_visemds.prompt_builder import output_instruction, task_text
 
 
 class PromptBuilderTests(unittest.TestCase):
+    def test_manuscript_prompt_uses_two_stage_boundary_aware_template(self):
+        text = task_text("aid", self.classes, 3, prompt_mode="manuscript_v1")
+        self.assertIn("provisional label P and runner-up R", text)
+        self.assertIn("Only if P and R remain ambiguous", text)
+        self.assertIn("Boundary-aware Category Rules:", text)
+        self.assertIn("Visual-Semantic Demonstrations: 3", text)
+
     def setUp(self):
         self.classes = [
             "Airport", "BareLand", "BaseballField", "Beach", "Bridge",

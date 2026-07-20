@@ -48,8 +48,10 @@ Normalize each component independently over the complete `r*C` candidate pool, t
 
 ```text
 R = alpha*S_img_norm + beta*S_typ_norm + gamma*S_sem_norm
-alpha = beta = gamma = 1/3
+alpha = 0.6, beta = 0.2, gamma = 0.2
 ```
+
+These `(0.6, 0.2, 0.2)` weights are the paper's main setting and are also the code defaults. The main runner passes them explicitly to the builder. Uniform `(1/3, 1/3, 1/3)` weighting is not the main experiment and must be treated as a separate ablation.
 
 Select the overall top `k=3` candidates. The final list is not forced to be class-balanced and
 may contain repeated labels. Demonstrations are ordered by descending `R` in the prompt.
@@ -62,15 +64,17 @@ Run from the parent project root:
 python RS-ViSemDS/build_rs_visemds_examples.py \
   --dataset aid \
   --manifest-dir manifests/aid_eval100_seed42 \
-  --out-dir RS-ViSemDS/examples/aid_eval100_seed42 \
+  --out-dir RS-ViSemDS/examples/aid_eval100_seed42_a0p6_b0p2_g0p2 \
   --r 3 --k 3 \
+  --alpha 0.6 --beta 0.2 --gamma 0.2 \
   --remoteclip-cache checkpoints
 
 python RS-ViSemDS/build_rs_visemds_examples.py \
   --dataset nwpu_fg_urban \
   --manifest-dir manifests/nwpu_eval100_seed42 \
-  --out-dir RS-ViSemDS/examples/nwpu_fg_urban_eval100_seed42 \
+  --out-dir RS-ViSemDS/examples/nwpu_fg_urban_eval100_seed42_a0p6_b0p2_g0p2 \
   --r 3 --k 3 \
+  --alpha 0.6 --beta 0.2 --gamma 0.2 \
   --remoteclip-cache checkpoints
 ```
 
@@ -86,10 +90,11 @@ Each output directory contains:
 python RS-ViSemDS/run_rs_visemds_mllm.py \
   --dataset nwpu_fg_urban \
   --manifest-dir manifests/nwpu_eval100_seed42 \
-  --selected-examples-csv RS-ViSemDS/examples/nwpu_fg_urban_eval100_seed42/examples_rs_visemds_shot_3.csv \
+  --selected-examples-csv RS-ViSemDS/examples/nwpu_fg_urban_eval100_seed42_a0p6_b0p2_g0p2/examples_rs_visemds_shot_3.csv \
   --model /root/autodl-tmp/models/Qwen3-VL-8B \
   --out-dir RS-ViSemDS/results_eval100_seed42/qwen3vl_8b_nwpu_fg_urban \
-  --torch-dtype bfloat16 --device-map auto --max-tokens 256 --resume
+  --torch-dtype bfloat16 --device-map auto --max-tokens 256 \
+  --prompt-mode manuscript_v1 --resume
 ```
 
 The runner reuses the parent project's `TransformersVisionLLM` and prediction parser. This is
@@ -101,8 +106,12 @@ zero/random/kNN baselines unfair.
 ```bash
 python RS-ViSemDS/run_rs_visemds_all.py \
   --datasets aid nwpu_fg_urban \
-  --models gemma3_12b qwen3vl_8b internvl35_14b
+  --models gemma3_12b qwen3vl_8b internvl35_14b \
+  --alpha 0.6 --beta 0.2 --gamma 0.2 \
+  --prompt-mode manuscript_v1
 ```
+
+Selections are stored in weight-tagged directories such as `a0p6_b0p2_g0p2`, and result paths additionally include the prompt mode. The manuscript main suite explicitly uses `manuscript_v1`; the legacy and fallback modes are auxiliary analyses. Before reusing an existing selection, the runner verifies `selection_config.json`, all three weights, `r`, `k`, the selected CSV hash, and all manifest hashes. A stale uniform-weight selection therefore cannot be silently reused as a paper-main result.
 
 Use `--dry-run` to inspect commands and `--limit 8` for a small inference smoke test. A selection
 smoke test can use `build_rs_visemds_examples.py --limit-per-class 1` in a separate output folder.
@@ -126,3 +135,18 @@ stage. Per-target results separately record selection, generation, and combined 
 silently merge one-time cache construction into per-image inference time; state the convention
 used in the paper table.
 
+## 9. AutoDL and ablation scripts
+
+The `run_*_autodl.sh` scripts locate the project root from their own file location, so they may
+be called from any working directory. Override `PROJECT_ROOT`, `PYTHON_BIN`, model-path variables,
+or `REMOTECLIP_CHECKPOINT` when the AutoDL layout differs from the defaults. The default
+RemoteCLIP path is `checkpoints/RemoteCLIP-ViT-B-32.pt` under the project root.
+
+The fallback prompt scripts intentionally reuse frozen selections rather than rebuilding them:
+
+- Run `run_aid_three_classes_v3_autodl.sh` before the AID reference-only/fallback scripts.
+- Run `run_nwpu_prompt_ablation_602020_autodl.sh` before the NWPU fallback scripts.
+
+These scripts are auxiliary ablations. The paper's main experiment remains
+`run_rs_visemds_all.py` with `(alpha, beta, gamma)=(0.6, 0.2, 0.2)` and
+`prompt_mode=manuscript_v1`.
