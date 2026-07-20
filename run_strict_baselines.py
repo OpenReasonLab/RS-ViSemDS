@@ -109,6 +109,12 @@ def predict_one(model, image_tensor):
 
 def main():
     args = parse_args()
+    if len(args.models) != 1:
+        raise ValueError(
+            "Pass exactly one model so its selections can be validated against the "
+            "corresponding ImageNet backbone."
+        )
+    model_name = args.models[0]
     manifest_dir = repo_path(args.manifest_dir, Path.cwd())
     examples_csv = repo_path(args.examples_csv, Path.cwd())
     out_dir = repo_path(args.out_dir, Path.cwd())
@@ -123,7 +129,7 @@ def main():
     strategies = {row["strategy"] for row in examples}
     if strategies != {"knn"}:
         raise ValueError(
-            "Traditional few-shot baselines require query-specific RemoteCLIP kNN examples. "
+            "Traditional few-shot baselines require query-specific per-class kNN examples. "
             f"Found strategies: {sorted(strategies)}"
         )
     retrieval_config_path = examples_csv.parent / "retrieval_config.json"
@@ -134,14 +140,16 @@ def main():
         )
     retrieval_config = read_json(retrieval_config_path)
     if (
-        retrieval_config.get("feature_backend") != "remoteclip"
-        or retrieval_config.get("encoder") != "RemoteCLIP-ViT-B-32"
+        retrieval_config.get("feature_backend") != "imagenet_backbone"
+        or retrieval_config.get("encoder") != model_name
+        or retrieval_config.get("scope") != "per_class_support_pool"
+        or retrieval_config.get("shot_definition") != "examples_per_class"
         or retrieval_config.get("similarity") != "cosine_similarity"
         or not retrieval_config.get("l2_normalized_embeddings")
     ):
         raise ValueError(
-            "Traditional few-shot baselines require L2-normalized RemoteCLIP-ViT-B-32 "
-            "embeddings with cosine similarity."
+            f"Model {model_name} requires per-class cosine kNN selections extracted "
+            "by the same frozen ImageNet backbone."
         )
     retrieval_config_hash = sha256_file(retrieval_config_path)
     examples_by_target = {}

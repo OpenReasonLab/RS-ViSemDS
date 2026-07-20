@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/root/autodl-tmp/remote_sensing_project/strict_fewshot_baselines}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="${PROJECT_ROOT:-$SCRIPT_DIR}"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 MODEL_PATH="${INTERNVL35_14B_MODEL:-/root/autodl-tmp/models/InternVL3.5-14B}"
 REMOTECLIP_CHECKPOINT="${REMOTECLIP_CHECKPOINT:-$PROJECT_ROOT/checkpoints/RemoteCLIP-ViT-B-32.pt}"
@@ -73,6 +74,7 @@ if [[ "$PREPARE_EXAMPLES" == "1" ]]; then
     --datasets aid nwpu_fg_urban
     --strategies random knn
     --shots 1 3 5 10
+    --skip-manifests
     --remoteclip-cache checkpoints
     --feature-batch-size 64
     --feature-num-workers 4

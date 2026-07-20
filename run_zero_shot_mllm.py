@@ -33,7 +33,7 @@ from strict_fewshot.utils import (
 
 
 INVALID_LABEL = "__INVALID__"
-ZZZ_OPENAI_BASE = "https://api.zhizengzeng.com/v1"
+OFFICIAL_OPENAI_BASE = "https://api.openai.com/v1"
 
 
 def parse_args():
@@ -45,15 +45,16 @@ def parse_args():
     parser.add_argument(
         "--api-base",
         default=(
-            os.environ.get("ZZZ_API_BASE")
+            os.environ.get("OPENAI_BASE_URL")
+            or os.environ.get("OPENAI_API_BASE")
             or os.environ.get("MLLM_API_BASE")
-            or ZZZ_OPENAI_BASE
+            or OFFICIAL_OPENAI_BASE
         ),
     )
     parser.add_argument(
         "--api-key",
         default=(
-            os.environ.get("ZZZ_API_KEY")
+            os.environ.get("OPENAI_API_KEY")
             or os.environ.get("MLLM_API_KEY")
             or ""
         ),
@@ -72,8 +73,8 @@ def parse_args():
     parser.add_argument(
         "--invalid-retries",
         type=int,
-        default=1,
-        help="Regenerate once when the model response cannot be parsed as one candidate class.",
+        default=0,
+        help="Optional non-paper retry count; the manuscript protocol uses 0.",
     )
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=42)
@@ -118,10 +119,9 @@ def image_to_data_url(path: Path, preserve_metadata: bool = False) -> str:
 
 
 SYSTEM_PROMPT = (
-    "You are a remote-sensing scene classification assistant. Analyze only the visible "
-    "content of the supplied overhead image. Do not use filenames, metadata, or unstated "
-    "context. Select exactly one label from the provided candidate list. Report concise, "
-    "observable visual evidence rather than hidden step-by-step reasoning."
+    "You are a remote-sensing scene classification assistant. Analyze only visible "
+    "content in the supplied overhead images. Do not use filenames, metadata, or "
+    "unstated context. Select exactly one label from the candidate list."
 )
 
 
@@ -156,10 +156,11 @@ def format_class_options(class_order: list[str]) -> str:
 def build_prompt(dataset: str, class_order: list[str], prompt_mode: str = "guided") -> str:
     classes = ", ".join(class_order)
     prompt = (
-        "Task: Classify the target remote-sensing image into exactly one candidate class.\n\n"
-        f"Candidate classes: {classes}\n\n"
-        "Allowed answer strings, copy exactly including underscores and capitalization:\n"
-        f"{format_class_options(class_order)}\n\n"
+        "Task Instruction: Classify the target remote-sensing image into exactly one "
+        "candidate class.\n\n"
+        f"Candidate Label Set: {classes}\n"
+        "Allowed answer strings must be copied exactly, including capitalization and underscores.\n\n"
+        "Target Input: the supplied image is the unlabeled target image.\n\n"
     )
     if prompt_mode == "guided":
         considerations = DATASET_CONSIDERATIONS.get(
@@ -168,12 +169,10 @@ def build_prompt(dataset: str, class_order: list[str], prompt_mode: str = "guide
         )
         prompt += f"Dataset-specific considerations: {considerations}\n\n"
     return prompt + (
-        "First inspect the visible structures, textures, spatial arrangement, and scene context. "
-        "Then return exactly one compact JSON object and no other text. The answer value must be "
-        "copied exactly from the allowed answer strings, score must be a number from 0 to 1, and "
-        "thoughts must contain only a brief summary of observable visual evidence:\n"
-        '{"thoughts": "<brief visual evidence>", "answer": "<one candidate class>", '
-        '"score": <number from 0 to 1>}'
+        "Query: Classify the target image into exactly one candidate class.\n\n"
+        "Output Format: Return exactly one compact JSON object and no other text: "
+        '{"thoughts":"<brief observable visual evidence>",'
+        '"answer":"<one candidate class>","score":<number from 0 to 1>}'
     )
 
 
@@ -450,6 +449,8 @@ def summarize_rows(
             pred_idx = class_to_idx.get(row.get("pred_label", ""), len(class_order))
             matrix[true_idx][pred_idx] += 1
 
+        precision_values = []
+        recall_values = []
         f1_values = []
         per_class_accuracy = {}
         for label, index in class_to_idx.items():
@@ -459,6 +460,8 @@ def summarize_rows(
             recall = tp / support if support else 0.0
             precision = tp / pred_count if pred_count else 0.0
             f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+            precision_values.append(precision)
+            recall_values.append(recall)
             f1_values.append(f1)
             per_class_accuracy[label] = recall
             per_class_rows.append({
@@ -488,6 +491,12 @@ def summarize_rows(
             "num_correct": sum(int_value(row.get("correct")) for row in model_rows),
             "overall_accuracy": (
                 sum(int_value(row.get("correct")) for row in model_rows) / total if total else 0.0
+            ),
+            "macro_precision": (
+                sum(precision_values) / len(precision_values) if precision_values else 0.0
+            ),
+            "macro_recall": (
+                sum(recall_values) / len(recall_values) if recall_values else 0.0
             ),
             "macro_f1": sum(f1_values) / len(f1_values) if f1_values else 0.0,
             "num_valid_predictions": valid_predictions,
@@ -603,7 +612,7 @@ def main():
     invocation_start = time.perf_counter()
     if args.backend == "api" and not args.api_key:
         raise SystemExit(
-            "Missing API key. Set ZZZ_API_KEY (recommended) or pass --api-key."
+            "Missing API key. Set OPENAI_API_KEY or pass --api-key."
         )
     manifest_dir = repo_path(args.manifest_dir, Path.cwd())
     out_dir = repo_path(args.out_dir, Path.cwd())
@@ -629,7 +638,11 @@ def main():
 
     config = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "provider": "local_transformers" if args.backend == "transformers" else "zhizengzeng",
+        "provider": (
+            "local_transformers"
+            if args.backend == "transformers"
+            else "openai" if args.api_base.rstrip("/") == OFFICIAL_OPENAI_BASE else "openai_compatible"
+        ),
         "dataset": summary["dataset"],
         "manifest_dir": args.manifest_dir,
         "evaluation_sha256": sha256_file(manifest_dir / "evaluation.csv"),
@@ -741,13 +754,13 @@ def main():
                     messages = [{
                         "role": "user",
                         "content": [
-                            image_part(),
                             text_part(
                                 SYSTEM_PROMPT
                                 + "\n\n"
                                 + build_prompt(summary["dataset"], class_order, args.prompt_mode)
                                 + (("\n\n" + invalid_retry_note) if invalid_retry_note else "")
                             ),
+                            image_part(),
                         ],
                     }]
                     raw_text = local_model.generate_from_messages(

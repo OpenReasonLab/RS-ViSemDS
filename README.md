@@ -64,7 +64,7 @@ run_full_data_fixed_eval_all.py  四个 full-data 模型统一入口
 verify_package.py                数据划分与纯代码包完整性校验器
 ```
 
-论文与代码的逐项核查记录见 `MANUSCRIPT_CODE_CONSISTENCY.md`，随机种子和数据集来源见 `SEEDS_AND_DATASETS.md`。
+论文与代码的逐项核查记录见 `MANUSCRIPT_CODE_CONSISTENCY.md`，随机种子和数据集来源见 `SEEDS_AND_DATASETS.md`，GitHub 上传范围与排除项见 `GITHUB_UPLOAD_CHECKLIST.md`。
 
 ## 🔒 3. 固定评估协议
 

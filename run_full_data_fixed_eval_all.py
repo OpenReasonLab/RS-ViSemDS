@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
         choices=["resnet18", "resnet50", "vit_tiny", "vit_small"],
         default=["resnet18", "resnet50", "vit_tiny", "vit_small"],
     )
-    parser.add_argument("--seeds", nargs="+", type=int, default=[42, 43, 44])
+    parser.add_argument("--seeds", nargs="+", type=int, default=[42])
     parser.add_argument("--max-epochs", type=int, choices=[10], default=10)
     parser.add_argument("--validation-ratio", type=float, default=0.10)
     parser.add_argument("--batch-size", type=int, default=64)

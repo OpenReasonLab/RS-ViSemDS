@@ -2,6 +2,7 @@ torch
 torchvision
 timm
 pillow
+numpy
 open_clip_torch
 huggingface_hub
 transformers

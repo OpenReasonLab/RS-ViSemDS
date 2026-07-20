@@ -2,24 +2,25 @@
 
 ## Included
 
-- Seven current eval100 MLLM launchers.
-- Shared zero-shot, Random few-shot, and global RemoteCLIP-kNN MLLM evaluators.
-- Four traditional vision model few-shot and fixed-evaluation full-data runners.
-- `strict_fewshot` shared data, model, feature, metric, and local-MLLM utilities.
-- AID and NWPU-Urban configs.
-- Exact seed-42 eval100 manifests.
-- Precomputed per-class RemoteCLIP kNN CSV/JSON files used by traditional few-shot runs.
-- Complete RS-ViSemDS implementation, tests, and shell launchers.
-- Two empty raw-dataset directories.
+- Seven eval100 MLLM launchers and the shared zero-shot, Random few-shot, and global RemoteCLIP-kNN evaluators.
+- Four conventional visual few-shot baselines with model-specific ImageNet-backbone kNN retrieval.
+- Four full-data frozen-backbone, head-only transfer-learning baselines.
+- The complete RS-ViSemDS implementation, manuscript prompt, tests, and launchers.
+- The manuscript's Figure 2 and Figure 3 protocol/framework PDFs under `assets/`.
+- AID and NWPU-Urban configuration files and exact seed-42 eval100 manifests.
+- Raw-data directory placeholders tracked with `.gitkeep`; no dataset images are included.
+- Package tests, consistency notes, and a SHA-256 payload inventory.
+- The repository's existing MIT license.
 
-## Intentionally excluded
+## Intentionally Excluded
 
-- All raw images and downloaded dataset archives.
-- All MLLM, ImageNet backbone, and RemoteCLIP weight files.
-- Checkpoints, feature caches, generated RS-ViSemDS selections, results, logs, plots, and tables.
+- Raw images and dataset archives.
+- MLLM, ImageNet-backbone, and RemoteCLIP weights or caches.
+- Generated Random/kNN/RS-ViSemDS example selections.
+- Predictions, metrics, confusion matrices, checkpoints, logs, result plots, and result tables.
+- PDFs other than the two explicitly packaged manuscript protocol/framework figures.
 - API keys, passwords, SSH credentials, and machine-specific environment files.
-- Old 24-images-per-class manifests and launchers.
-- Old HRS/Skill Prompt experiments that are not the final RS-ViSemDS implementation.
-- Duplicate model-folder copies of common scripts.
+- Old 24-images-per-class code and obsolete experiment outputs.
 
-`PACKAGE_FILE_LIST.txt` is generated from the final package and gives the relative path, byte size, and SHA-256 hash of every payload file (the list file itself is excluded).
+`PACKAGE_FILE_LIST.txt` inventories every included payload file except itself. The package
+validator rejects generated examples and experiment-result artifacts.

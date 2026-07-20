@@ -41,7 +41,7 @@ from run_zero_shot_mllm import (
 )
 
 
-ZZZ_OPENAI_BASE = "https://api.zhizengzeng.com/v1"
+OFFICIAL_OPENAI_BASE = "https://api.openai.com/v1"
 
 
 class ProviderResponseError(RuntimeError):
@@ -59,11 +59,11 @@ def parse_args():
     parser.add_argument("--backend", choices=("api", "transformers"), default="api")
     parser.add_argument(
         "--api-base",
-        default=os.environ.get("ZZZ_API_BASE") or os.environ.get("MLLM_API_BASE") or ZZZ_OPENAI_BASE,
+        default=os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE") or os.environ.get("MLLM_API_BASE") or OFFICIAL_OPENAI_BASE,
     )
     parser.add_argument(
         "--api-key",
-        default=os.environ.get("ZZZ_API_KEY") or os.environ.get("MLLM_API_KEY") or "",
+        default=os.environ.get("OPENAI_API_KEY") or os.environ.get("MLLM_API_KEY") or "",
     )
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=256)
@@ -84,8 +84,8 @@ def parse_args():
     parser.add_argument(
         "--invalid-retries",
         type=int,
-        default=1,
-        help="Regenerate once when the model response cannot be parsed as one candidate class.",
+        default=0,
+        help="Optional non-paper retry count; the manuscript protocol uses 0.",
     )
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=42)
@@ -103,13 +103,11 @@ def build_task_prompt(
     prompt_mode: str,
 ) -> str:
     prompt = (
-        "Task: Use the labeled remote-sensing examples below as visual context, then classify "
-        "the final unlabeled target image into exactly one candidate class.\n\n"
-        f"Candidate classes ({len(class_order)}): {', '.join(class_order)}\n\n"
-        "Allowed answer strings, copy exactly including underscores and capitalization:\n"
-        f"{format_class_options(class_order)}\n\n"
-        f"The prompt contains {shot} labeled example image(s). Examples are ordered by rank and "
-        "may repeat classes because they were sampled uniformly from the full support pool.\n\n"
+        "Task Instruction: Use the randomly sampled labeled images below as visual "
+        "reference examples to classify the target image.\n\n"
+        f"Candidate Label Set: {', '.join(class_order)}\n"
+        "Allowed answer strings must be copied exactly, including capitalization and underscores.\n\n"
+        f"Randomly Sampled Demonstrations: {shot} labeled image(s) follow.\n\n"
     )
     if prompt_mode == "guided":
         prompt += (
@@ -118,12 +116,10 @@ def build_task_prompt(
             + "\n\n"
         )
     return prompt + (
-        "Do not infer labels from filenames or metadata. Use the example labels and visible image "
-        "content only. After the final target image, return exactly one compact JSON object and no "
-        "other text. The answer value must be copied exactly from the allowed answer strings; score "
-        "must be from 0 to 1; thoughts must briefly summarize observable visual evidence:\n"
-        '{"thoughts": "<brief visual evidence>", "answer": "<one candidate class>", '
-        '"score": <number from 0 to 1>}'
+        "Query: Classify the target image into exactly one candidate class.\n\n"
+        "Output Format: Return exactly one compact JSON object and no other text: "
+        '{"thoughts":"<brief observable visual evidence>",'
+        '"answer":"<one candidate class>","score":<number from 0 to 1>}'
     )
 
 
@@ -163,7 +159,7 @@ def build_content(
     content.extend([
         {
             "type": "text",
-            "text": "Final unlabeled target image. Classify this image; its filename and true label are not provided:",
+            "text": "Target Input: the next image is the unlabeled target image.",
         },
         {
             "type": "image_url",
@@ -207,10 +203,7 @@ def build_local_messages_and_images(
             image_part(),
         ])
     content.extend([
-        text_part(
-            "Final unlabeled target image. Classify this image; its filename "
-            "and true label are not provided:"
-        ),
+        text_part("Target Input: the next image is the unlabeled target image."),
         image_part(),
     ])
     return [{"role": "user", "content": content}], loaded_images
@@ -359,7 +352,7 @@ def main():
     args = parse_args()
     invocation_start = time.perf_counter()
     if args.backend == "api" and not args.api_key:
-        raise SystemExit("Missing API key. Set ZZZ_API_KEY or pass --api-key.")
+        raise SystemExit("Missing API key. Set OPENAI_API_KEY or pass --api-key.")
     manifest_dir = repo_path(args.manifest_dir, Path.cwd())
     examples_csv = repo_path(args.examples_csv, Path.cwd())
     out_dir = repo_path(args.out_dir, Path.cwd())
@@ -390,7 +383,11 @@ def main():
 
     config = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "provider": "local_transformers" if args.backend == "transformers" else "zhizengzeng",
+        "provider": (
+            "local_transformers"
+            if args.backend == "transformers"
+            else "openai" if args.api_base.rstrip("/") == OFFICIAL_OPENAI_BASE else "openai_compatible"
+        ),
         "dataset": summary["dataset"],
         "strategy": "random",
         "shot": shot,

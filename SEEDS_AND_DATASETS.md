@@ -30,7 +30,7 @@ Observe the licenses and citation requirements shown on the official pages.
 | MLLM generation | deterministic decoding | Temperature is 0.0; local Transformers generation uses `do_sample=False`. |
 | Metrics bootstrap | 42 | Uses 10,000 bootstrap samples for the accuracy confidence interval. |
 | Traditional few-shot | 42 | Base training seed; the runner derives stable model/target-specific seeds from it. |
-| Full-data baselines | 42, 43, 44 | Three independent runs; maximum/final training epoch is 10. |
+| Full-data baselines | 42 | Manuscript run; maximum/final training epoch is 10. |
 | RS-ViSemDS selection | deterministic | Uses the seed-42 manifest and deterministic RemoteCLIP visual-semantic ranking. |
 | RS-ViSemDS metrics bootstrap | 42 | Uses 10,000 bootstrap samples. |
 
@@ -43,3 +43,4 @@ Observe the licenses and citation requirements shown on the official pages.
 
 The exact file paths and class-wise counts are recorded in each manifest's `evaluation.csv`, `support.csv`, `class_order.json`, and `summary.json`.
 
+For RemoteCLIP kNN reproduction, the seed alone is not sufficient: use the same `RemoteCLIP-ViT-B-32.pt` checkpoint and record its SHA-256. Different model weights or library kernels can change near-tie ordering even when the manifest is identical.

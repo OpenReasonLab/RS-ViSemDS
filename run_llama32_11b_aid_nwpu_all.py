@@ -19,12 +19,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shots", nargs="+", type=int, default=[1, 3, 5, 10])
     parser.add_argument(
         "--model",
-        default=os.environ.get("LLAMA32_11B_MODEL", "llama-3.2-11b-vision-instruct"),
+        default=os.environ.get(
+            "LLAMA32_11B_MODEL",
+            "/root/autodl-tmp/models/Llama-3.2-11B-Vision-Instruct",
+        ),
     )
     parser.add_argument("--out-root", default="Llama 3.2-11B/results_eval100_seed42")
-    parser.add_argument("--backend", choices=["transformers", "api"], default="api")
-    parser.add_argument("--api-base", default=os.environ.get("ZZZ_API_BASE") or os.environ.get("MLLM_API_BASE") or "https://api.zhizengzeng.com/v1")
-    parser.add_argument("--api-key", default=os.environ.get("ZZZ_API_KEY") or os.environ.get("MLLM_API_KEY") or "")
+    parser.add_argument("--backend", choices=["transformers", "api"], default="transformers")
+    parser.add_argument("--api-base", default=os.environ.get("OPENAI_BASE_URL") or os.environ.get("MLLM_API_BASE") or "https://api.openai.com/v1")
+    parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY") or os.environ.get("MLLM_API_KEY") or "")
     parser.add_argument("--prompt-mode", choices=["minimal", "guided"], default="minimal")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=256)
@@ -91,16 +94,18 @@ def backend_args(args: argparse.Namespace) -> list[str]:
 
 def main() -> None:
     args = parse_args()
-    root = Path.cwd()
+    code_root = Path(__file__).resolve().parent
+    root = Path(os.environ.get("PROJECT_ROOT", code_root)).resolve()
+    os.chdir(root)
 
     if args.backend == "api" and not args.api_key and not args.dry_run:
-        raise SystemExit("Missing API key. Set ZZZ_API_KEY/MLLM_API_KEY, or pass --api-key.")
+        raise SystemExit("Missing API key. Set OPENAI_API_KEY or pass --api-key.")
     if args.backend == "transformers" and not args.dry_run:
         require_dir(Path(args.model))
 
-    zero_script = root / "run_zero_shot_mllm.py"
-    random_script = root / "run_random_fewshot_mllm.py"
-    knn_script = root / "run_knn_totalshot_mllm.py"
+    zero_script = code_root / "run_zero_shot_mllm.py"
+    random_script = code_root / "run_random_fewshot_mllm.py"
+    knn_script = code_root / "run_knn_totalshot_mllm.py"
     if not args.skip_zero:
         require_file(zero_script)
     if not args.skip_random:
@@ -109,7 +114,8 @@ def main() -> None:
         require_file(knn_script)
 
     out_root = root / args.out_root
-    out_root.mkdir(parents=True, exist_ok=True)
+    if not args.dry_run:
+        out_root.mkdir(parents=True, exist_ok=True)
     base_backend_args = backend_args(args)
 
     for dataset in args.datasets:
@@ -140,7 +146,8 @@ def main() -> None:
 
             if not args.skip_random:
                 random_csv = random_dir / f"examples_random_shot_{shot}.csv"
-                require_file(random_csv)
+                if not args.dry_run:
+                    require_file(random_csv)
                 command = [
                     args.python,
                     str(random_script),
@@ -153,7 +160,8 @@ def main() -> None:
 
             if not args.skip_knn:
                 knn_csv = knn_dir / f"examples_knn_shot_{shot}.csv"
-                require_file(knn_csv)
+                if not args.dry_run:
+                    require_file(knn_csv)
                 command = [
                     args.python,
                     str(knn_script),
