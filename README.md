@@ -1,9 +1,9 @@
 # RS-ViSemDS: Visual-Semantic Demonstration Selection for Remote Sensing Scene Classification with Open-Weight Multimodal Large Language Models
 
 <p align="center">
-  <a href="assets/fig02_datasets_models_baseline_protocols.pdf">📄 Figure 2: Datasets, Models, and Baseline Protocols</a>
+  <a href="assets/fig02_datasets_models_baseline_protocols.pdf">📄 Figure 1: Datasets, Models, and Baseline Protocols</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="assets/fig03_rs_visemds_framework.pdf">🧩 Figure 3: RS-ViSemDS Framework</a>
+  <a href="assets/fig03_rs_visemds_framework.pdf">🧩 Figure 2: RS-ViSemDS Framework</a>
 </p>
 
 This repository provides the experimental reproduction code for the paper **RS-ViSemDS**. It follows the final evaluation protocol used in the manuscript, with **100 fixed test images per class and random seed 42**.
@@ -49,7 +49,7 @@ The main experiments are conducted with the following three open-weight MLLMs:
 
 ```text
 configs/                         Dataset and category configurations
-assets/                          Paper Figures 2 and 3 in PDF format
+assets/                          Paper Figures 1 and 2 in PDF format
 data_raw/                        Raw dataset directory; empty in the release package
 examples/                        Runtime-generated Random/kNN demonstration files
 manifests/                       Fixed seed-42 data splits used in the paper
