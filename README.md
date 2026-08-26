@@ -1,8 +1,8 @@
 # RS-ViSemDS
 
-Official implementation of **RS-ViSemDS: Visual-Semantic Demonstration Selection for Remote Sensing Scene Classification with Open-Weight Multimodal Large Language Models**.
+Official implementation of **RS-ViSemDS: Query-Adaptive Visual-Semantic Demonstration Selection for Remote Sensing Scene Classification With Open-Weight Multimodal Large Language Models**.
 
-RS-ViSemDS uses RemoteCLIP to construct a class-balanced candidate pool, estimates target-adaptive visual and semantic evidence, and selects a global Top-3 demonstration set for frozen MLLM classification.
+RS-ViSemDS addresses the limitations of visual nearest-neighbor prompting by jointly modeling target-candidate visual relevance, candidate-category typicality, and target-category semantic affinity. It adaptively balances these signals according to query-specific evidence concentration and disagreement, while boundary-aware category rules guide frozen MLLM inference without task-specific parameter updates.
 
 [Experimental protocols](assets/fig02_datasets_models_baseline_protocols.pdf) · [RS-ViSemDS framework](assets/fig03_rs_visemds_framework.pdf)
 
@@ -17,7 +17,7 @@ The fixed split uses seed 42. Accuracy, macro Precision, macro Recall, and macro
 
 ## Method
 
-- RemoteCLIP image/text embeddings and ten-description semantic prototypes.
+- Short category-description ensembles and boundary-aware category rules encode complementary category knowledge.
 - Class-balanced visual retrieval with the top 3 candidates per class.
 - Support-only temperature calibration and adaptive visual-semantic fusion with base prior `(0.6, 0.2, 0.2)`.
 - Pure global Top-3 selection followed by greedy frozen-MLLM inference.
