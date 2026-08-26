@@ -17,17 +17,17 @@ SHOTS = (1, 3, 5, 10)
 DATASETS = {
     "aid": {
         "manifest": EVAL100_DATASET_CONFIG["aid"]["manifest"],
-        "examples_root": EVAL100_DATASET_CONFIG["aid"]["per_class_knn_examples_root"],
+        "examples": EVAL100_DATASET_CONFIG["aid"]["per_class_knn_examples"],
         "config": EVAL100_DATASET_CONFIG["aid"]["config"],
         "data_root": EVAL100_DATASET_CONFIG["aid"]["data_root"],
-        "results_prefix": f"aid_{PROTOCOL_TAG}_backbone_knn_per_class",
+        "results_prefix": f"aid_{PROTOCOL_TAG}_remoteclip_knn_per_class",
     },
     "nwpu": {
         "manifest": EVAL100_DATASET_CONFIG["nwpu_fg_urban"]["manifest"],
-        "examples_root": EVAL100_DATASET_CONFIG["nwpu_fg_urban"]["per_class_knn_examples_root"],
+        "examples": EVAL100_DATASET_CONFIG["nwpu_fg_urban"]["per_class_knn_examples"],
         "config": EVAL100_DATASET_CONFIG["nwpu_fg_urban"]["config"],
         "data_root": EVAL100_DATASET_CONFIG["nwpu_fg_urban"]["data_root"],
-        "results_prefix": f"nwpu_{PROTOCOL_TAG}_backbone_knn_per_class",
+        "results_prefix": f"nwpu_{PROTOCOL_TAG}_remoteclip_knn_per_class",
     },
 }
 
@@ -35,8 +35,8 @@ DATASETS = {
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Generate class-balanced kNN examples with each corresponding frozen "
-            "ImageNet backbone and run conventional few-shot baselines."
+            "Generate class-balanced RemoteCLIP KNN examples and run frozen-backbone "
+            "ImageNet few-shot baselines for AID and NWPU-FG-Urban."
         )
     )
     parser.add_argument("--datasets", nargs="+", choices=DATASETS, default=list(DATASETS))
@@ -50,10 +50,18 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--seeds",
+        nargs="+",
+        type=int,
+        default=list(range(42, 52)),
+        help="Ten independent training seeds; manuscript default: 42 through 51.",
+    )
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--feature-batch-size", type=int, default=64)
     parser.add_argument("--feature-num-workers", type=int, default=0)
+    parser.add_argument("--remoteclip-cache", default="checkpoints")
+    parser.add_argument("--remoteclip-checkpoint", default=None)
     parser.add_argument(
         "--results-root",
         default=f"results_{PROTOCOL_TAG}/traditional_per_class_fewshot",
@@ -74,6 +82,11 @@ def parse_args():
         help="Regenerate the fixed 100-images-per-class manifests before retrieval.",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip a run when its summary.json already exists.",
+    )
     return parser.parse_args()
 
 
@@ -106,41 +119,54 @@ def prepare_manifest(dataset: str, config: dict, args) -> None:
         "--eval-per-class",
         "100",
         "--seed",
-        str(args.seed),
+        "42",
     ]
     print(f"\n[{dataset.upper()}] Preparing eval100 manifest", flush=True)
     run(command, args.dry_run)
 
 
-def build_examples(dataset: str, config: dict, model: str, args) -> None:
-    examples_dir = f"{config['examples_root']}/{model}"
+def build_examples(dataset: str, config: dict, args) -> None:
     command = [
         sys.executable,
-        "build_backbone_knn_examples.py",
+        "build_examples.py",
         "--manifest-dir",
         config["manifest"],
-        "--model",
-        model,
+        "--strategy",
+        "knn",
+        "--knn-scope",
+        "per_class",
         "--shots",
         *[str(shot) for shot in args.shots],
         "--out-dir",
-        examples_dir,
-        "--batch-size",
+        config["examples"],
+        "--feature-backend",
+        "remoteclip",
+        "--remoteclip-cache",
+        args.remoteclip_cache,
+        "--feature-batch-size",
         str(args.feature_batch_size),
-        "--num-workers",
+        "--feature-num-workers",
         str(args.feature_num_workers),
         "--seed",
-        str(args.seed),
+        "42",
     ]
-    print(f"\n[{dataset.upper()} / {model}] Generating per-class backbone kNN examples", flush=True)
+    if args.remoteclip_checkpoint:
+        command.extend(["--remoteclip-checkpoint", args.remoteclip_checkpoint])
+    print(f"\n[{dataset.upper()}] Generating per-class RemoteCLIP examples", flush=True)
     run(command, args.dry_run)
 
 
-def train(dataset: str, config: dict, model: str, shot: int, args) -> None:
-    examples_csv = f"{config['examples_root']}/{model}/examples_knn_shot_{shot}.csv"
+def train(dataset: str, config: dict, shot: int, seed: int, args) -> str:
+    examples_csv = f"{config['examples']}/examples_knn_shot_{shot}.csv"
     if not args.dry_run:
         require_file(examples_csv)
-    output_dir = f"{args.results_root}/{config['results_prefix']}_{model}_shot_{shot}_head"
+    output_dir = (
+        f"{args.results_root}/{config['results_prefix']}_shot_{shot}_head/"
+        f"run_seed_{seed}"
+    )
+    if args.resume and (PROJECT_DIR / output_dir / "summary.json").is_file():
+        print(f"\n[{dataset.upper()}] Reusing completed run: {output_dir}", flush=True)
+        return output_dir
     command = [
         sys.executable,
         "run_strict_baselines.py",
@@ -149,7 +175,7 @@ def train(dataset: str, config: dict, model: str, shot: int, args) -> None:
         "--examples-csv",
         examples_csv,
         "--models",
-        model,
+        *args.models,
         "--epochs",
         str(args.epochs),
         "--batch-size",
@@ -161,11 +187,33 @@ def train(dataset: str, config: dict, model: str, shot: int, args) -> None:
         "--train-mode",
         "head",
         "--seed",
-        str(args.seed),
+        str(seed),
         "--out-dir",
         output_dir,
     ]
-    print(f"\n[{dataset.upper()} / {model}] Training per-class {shot}-shot baseline", flush=True)
+    print(f"\n[{dataset.upper()}] Training per-class {shot}-shot baselines", flush=True)
+    run(command, args.dry_run)
+    return output_dir
+
+
+def aggregate(dataset: str, config: dict, shot: int, model: str, run_dirs: list[str], args) -> None:
+    output = (
+        f"{args.results_root}/{config['results_prefix']}_shot_{shot}_head/"
+        f"aggregate_{model}.json"
+    )
+    command = [
+        sys.executable,
+        "aggregate_paper_runs.py",
+        *run_dirs,
+        "--model",
+        model,
+        "--output",
+        output,
+    ]
+    print(
+        f"\n[{dataset.upper()}] Aggregating ten runs for {model}, {shot}-shot",
+        flush=True,
+    )
     run(command, args.dry_run)
 
 
@@ -173,6 +221,11 @@ def main() -> None:
     args = parse_args()
     if args.skip_examples and args.examples_only:
         raise SystemExit("--skip-examples and --examples-only cannot be used together.")
+    if len(args.seeds) != 10 or len(set(args.seeds)) != 10:
+        raise SystemExit(
+            "The manuscript protocol requires exactly ten distinct training seeds "
+            "(default: 42 through 51)."
+        )
 
     for dataset in args.datasets:
         config = DATASETS[dataset]
@@ -186,8 +239,7 @@ def main() -> None:
             require_file(f"{config['manifest']}/summary.json")
             validate_eval100_manifest(PROJECT_DIR / config["manifest"])
         if not args.skip_examples:
-            for model in args.models:
-                build_examples(dataset, config, model, args)
+            build_examples(dataset, config, args)
 
     if args.examples_only:
         print("\nExample generation completed.", flush=True)
@@ -195,9 +247,10 @@ def main() -> None:
 
     for dataset in args.datasets:
         config = DATASETS[dataset]
-        for model in args.models:
-            for shot in args.shots:
-                train(dataset, config, model, shot, args)
+        for shot in args.shots:
+            run_dirs = [train(dataset, config, shot, seed, args) for seed in args.seeds]
+            for model in args.models:
+                aggregate(dataset, config, shot, model, run_dirs, args)
 
     print("\nAll requested few-shot experiments completed.", flush=True)
 

@@ -9,26 +9,26 @@ import json
 AID_DESCRIPTION_ENSEMBLES = {
     "Airport": [
         "an overhead image of airport runways and taxiways",
-        "an aerial scene dominated by runways aprons and terminals",
+        "an aerial scene dominated by runways, aprons, and terminals",
         "a remote sensing image of airport infrastructure and aircraft parking areas",
         "an airport scene with long paved runways and connected taxiways",
-        "a scene showing airport aprons hangars and terminal buildings",
-        "an overhead view of aircraft runways and airport service areas",
+        "a scene showing airport aprons, hangars, and terminal buildings",
+        "an overhead view of aircraft, runways, and airport service areas",
         "a large airport layout with parallel runways and open paved surfaces",
         "an airport facility with runway strips and aircraft movement areas",
-        "a remote sensing scene dominated by airport transportation infrastructure",
-        "an aerial airport scene with runways taxiways aprons and aircraft",
+        "a remote sensing scene dominated by airport-specific transportation infrastructure",
+        "an aerial airport scene with runways, taxiways, aprons, and aircraft",
     ],
     "BareLand": [
         "an overhead image of exposed soil and cleared land",
-        "a bare ground scene with human disturbed open surfaces",
+        "a bare ground scene with human-disturbed open surfaces",
         "a remote sensing image of excavation areas and irregular bare land",
-        "a scene dominated by exposed earth and sparse vegetation",
-        "cleared construction land with soil dirt and rough ground texture",
-        "an aerial view of non sandy bare terrain and disturbed ground",
+        "a scene dominated by exposed earth without dense vegetation",
+        "cleared construction land with soil, dirt, and rough ground texture",
+        "an aerial view of non-sandy bare terrain and disturbed ground",
         "a bare land scene with irregular open soil surfaces",
         "an exposed ground area shaped by clearing or construction activity",
-        "a remote sensing scene of human disturbed barren land",
+        "a remote sensing scene of human-disturbed barren land",
         "an open land surface with exposed soil and limited vegetation",
     ],
     "BaseballField": [
@@ -133,7 +133,7 @@ AID_DESCRIPTION_ENSEMBLES = {
 NWPU_DESCRIPTION_ENSEMBLES = {
     "dense_residential": [
         "an overhead image of very compact residential buildings",
-        "a high density housing area with small gaps between buildings",
+        "a high-density housing area with small gaps between buildings",
         "a dense residential scene with repeated roofs and narrow roads",
         "a remote sensing image of continuous residential blocks",
         "an urban neighborhood dominated by tightly packed houses",
@@ -141,7 +141,7 @@ NWPU_DESCRIPTION_ENSEMBLES = {
         "a dense housing pattern with repeated small buildings",
         "an aerial view of crowded residential blocks and local streets",
         "a residential scene with very high building coverage",
-        "a high density neighborhood with continuous housing texture",
+        "a high-density neighborhood with continuous housing texture",
     ],
     "medium_residential": [
         "an overhead image of moderately spaced residential buildings",
@@ -181,15 +181,15 @@ NWPU_DESCRIPTION_ENSEMBLES = {
     ],
     "commercial_area": [
         "an overhead image of commercial buildings and business blocks",
-        "a commercial urban area with offices shops and service facilities",
-        "a business district with large buildings roads and parking areas",
-        "a mixed use commercial scene with retail and office structures",
-        "an aerial view of shopping centers office blocks and paved surfaces",
+        "a commercial urban area with offices, shops, and service facilities",
+        "a business district with large buildings, roads, and parking areas",
+        "a mixed-use commercial scene with retail and office structures",
+        "an aerial view of shopping centers, office blocks, and paved surfaces",
         "a remote sensing scene dominated by business and service facilities",
-        "a commercial area with shopping buildings roads and parking lots",
+        "a commercial area with shopping buildings, roads, and parking lots",
         "an urban business scene with organized roads and commercial blocks",
         "a retail and office district with dense urban infrastructure",
-        "a commercial land use scene with shops offices services and parking",
+        "a commercial land-use scene with shops, offices, services, and parking",
     ],
     "industrial_area": [
         "an overhead image of factories warehouses and storage yards",
@@ -295,6 +295,17 @@ def category_text_sha256(dataset: str, class_order: list[str]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def category_descriptions_sha256(dataset: str, class_order: list[str]) -> str:
+    """Hash exactly the ten-per-class texts used to build text prototypes."""
+    payload = {
+        "dataset": canonical_dataset_name(dataset),
+        "class_order": list(class_order),
+        "descriptions": description_ensembles(dataset, class_order),
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
 def _validate_text_map(source: dict, class_order: list[str], expected_count: int | None = None) -> None:
     missing = [label for label in class_order if label not in source]
     if missing:
@@ -303,4 +314,3 @@ def _validate_text_map(source: dict, class_order: list[str], expected_count: int
         wrong = {label: len(source[label]) for label in class_order if len(source[label]) != expected_count}
         if wrong:
             raise ValueError(f"Each category requires {expected_count} descriptions: {wrong}")
-

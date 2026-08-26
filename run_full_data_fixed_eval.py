@@ -12,7 +12,6 @@ import torch.nn as nn
 from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from torchvision.transforms import functional as TF
 
 from strict_fewshot.data import FewShotImageDataset
 from strict_fewshot.models import (
@@ -39,11 +38,6 @@ MODEL_DISPLAY_NAMES = {
 }
 
 
-class RandomQuarterTurn:
-    def __call__(self, image: Image.Image) -> Image.Image:
-        return TF.rotate(image, 90 * random.randrange(4))
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Leakage-free full-data linear-probe baseline on a fixed evaluation manifest."
@@ -56,15 +50,11 @@ def parse_args() -> argparse.Namespace:
         default=["resnet18", "resnet50", "vit_tiny", "vit_small"],
         choices=list(MODEL_DISPLAY_NAMES),
     )
-    parser.add_argument("--seeds", nargs="+", type=int, default=[42])
+    parser.add_argument("--seeds", nargs="+", type=int, default=list(range(42, 52)))
     parser.add_argument("--max-epochs", type=int, choices=[10], default=10)
     parser.add_argument("--validation-ratio", type=float, default=0.10)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--scheduler-factor", type=float, default=0.1)
-    parser.add_argument("--scheduler-patience", type=int, default=2)
-    parser.add_argument("--min-lr", type=float, default=1e-6)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--warmup-images", type=int, default=20)
     parser.add_argument("--resume", action="store_true")
@@ -115,18 +105,14 @@ def make_transforms():
     )
     train_transform = transforms.Compose(
         [
-            transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.5),
-            RandomQuarterTurn(),
+            transforms.Resize((224, 224)),
             transforms.ToTensor(),
             normalization,
         ]
     )
     eval_transform = transforms.Compose(
         [
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
+            transforms.Resize((224, 224)),
             transforms.ToTensor(),
             normalization,
         ]
@@ -369,17 +355,9 @@ def run_fixed_training_monitor(
         seed,
     )
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(
+    optimizer = torch.optim.Adam(
         trainable_head_parameters(model, model_name),
         lr=args.lr,
-        weight_decay=args.weight_decay,
-    )
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode="max",
-        factor=args.scheduler_factor,
-        patience=args.scheduler_patience,
-        min_lr=args.min_lr,
     )
 
     history: list[dict] = []
@@ -444,7 +422,6 @@ def run_fixed_training_monitor(
             f"lr={learning_rate:.2e} recorded={int(is_recorded_epoch)}",
             flush=True,
         )
-        scheduler.step(validation_metrics["macro_f1"])
 
     synchronize(device)
     selection_seconds = time.perf_counter() - selection_start
@@ -455,7 +432,7 @@ def run_fixed_training_monitor(
         "selection_training_seconds": train_seconds_total,
         "selection_validation_seconds": validation_seconds_total,
     }
-    del training_loader, validation_loader, optimizer, scheduler, model
+    del training_loader, validation_loader, optimizer, model
     if device.type == "cuda":
         torch.cuda.empty_cache()
     return recorded_epoch, recorded_history, history, timing
@@ -488,10 +465,9 @@ def retrain_on_full_support(
         seed + 10_000_019,
     )
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(
+    optimizer = torch.optim.Adam(
         trainable_head_parameters(model, model_name),
         lr=args.lr,
-        weight_decay=args.weight_decay,
     )
     history: list[dict] = []
     synchronize(device)
@@ -805,6 +781,8 @@ def main() -> None:
         "evaluation_size": len(evaluation_rows),
         "support_size": len(support_rows),
         "support_internal_validation_ratio": args.validation_ratio,
+        "support_development_seed": 42,
+        "support_development_runs": 1,
         "final_retraining": "reinitialize head and train on 100% support for exactly 10 epochs",
         "checkpoint_selection": "none; only the epoch-10 model is evaluated",
         "models": args.models,
@@ -816,26 +794,15 @@ def main() -> None:
             "vit_small": "timm vit_small_patch16_224 pretrained",
         },
         "train_mode": "frozen_backbone_linear_head",
-        "optimizer": "AdamW",
+        "optimizer": "Adam",
         "learning_rate": args.lr,
-        "weight_decay": args.weight_decay,
+        "weight_decay": 0.0,
         "batch_size": args.batch_size,
         "max_epochs": args.max_epochs,
         "early_stopping": False,
-        "scheduler": {
-            "name": "ReduceLROnPlateau",
-            "monitor": "internal_validation_macro_f1",
-            "factor": args.scheduler_factor,
-            "patience": args.scheduler_patience,
-            "min_lr": args.min_lr,
-        },
-        "augmentation": [
-            "RandomResizedCrop(224, scale=(0.8, 1.0))",
-            "RandomHorizontalFlip(0.5)",
-            "RandomVerticalFlip(0.5)",
-            "RandomQuarterTurn",
-        ],
-        "evaluation_transform": "Resize(256), CenterCrop(224), ImageNet normalization",
+        "scheduler": None,
+        "augmentation": [],
+        "evaluation_transform": "Resize((224,224)), ImageNet normalization",
         "metrics": ["accuracy", "macro_precision", "macro_recall", "macro_f1"],
         "inference_timing": "batch_size=1, end-to-end image load+preprocess+H2D+forward",
         "manifest_hashes": {
@@ -852,35 +819,31 @@ def main() -> None:
         flush=True,
     )
 
-    for model_name in args.models:
-        for seed in args.seeds:
-            run_dir = out_dir / model_name / f"seed_{seed}"
-            run_dir.mkdir(parents=True, exist_ok=True)
-            completed_path = run_dir / "run_summary.json"
-            if args.resume and completed_path.exists() and (run_dir / "predictions.csv").exists():
-                print(f"[{model_name} seed={seed}] already complete; skipping.", flush=True)
-                continue
+    selection_train, selection_validation, split_counts = stratified_support_split(
+        support_rows, class_order, args.validation_ratio, 42
+    )
+    write_json(
+        out_dir / "internal_split.json",
+        {
+            "seed": 42,
+            "counts": split_counts,
+            "selection_train_paths": [row["path"] for row in selection_train],
+            "selection_validation_paths": [row["path"] for row in selection_validation],
+        },
+    )
 
-            selection_train, selection_validation, split_counts = stratified_support_split(
-                support_rows, class_order, args.validation_ratio, seed
-            )
-            write_json(
-                run_dir / "internal_split.json",
-                {
-                    "seed": seed,
-                    "counts": split_counts,
-                    "selection_train_paths": [row["path"] for row in selection_train],
-                    "selection_validation_paths": [row["path"] for row in selection_validation],
-                },
-            )
-            print(
-                f"[{model_name} seed={seed}] selection train={len(selection_train)} "
-                f"validation={len(selection_validation)}",
-                flush=True,
-            )
-            recorded_epoch, recorded_history, selection_history, selection_timing = run_fixed_training_monitor(
+    for model_name in args.models:
+        development_dir = out_dir / model_name / "support_development_seed_42"
+        development_dir.mkdir(parents=True, exist_ok=True)
+        print(
+            f"[{model_name}] one-time support development seed=42 "
+            f"train={len(selection_train)} validation={len(selection_validation)}",
+            flush=True,
+        )
+        recorded_epoch, recorded_history, selection_history, selection_timing = (
+            run_fixed_training_monitor(
                 model_name,
-                seed,
+                42,
                 len(class_order),
                 selection_train,
                 selection_validation,
@@ -890,9 +853,19 @@ def main() -> None:
                 eval_transform,
                 args,
                 device,
-                run_dir,
+                development_dir,
             )
-            learning_rates = [float(row["learning_rate"]) for row in selection_history]
+        )
+        learning_rates = [float(row["learning_rate"]) for row in selection_history]
+
+        for seed in args.seeds:
+            run_dir = out_dir / model_name / f"seed_{seed}"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            completed_path = run_dir / "run_summary.json"
+            if args.resume and completed_path.exists() and (run_dir / "predictions.csv").exists():
+                print(f"[{model_name} seed={seed}] already complete; skipping.", flush=True)
+                continue
+
             model, retrain_history, final_retrain_seconds = retrain_on_full_support(
                 model_name,
                 seed,
@@ -919,8 +892,11 @@ def main() -> None:
                 args.warmup_images,
                 device,
             )
+            amortized_development_seconds = (
+                selection_timing["selection_seconds"] / len(args.seeds)
+            )
             train_validation_seconds_total = (
-                selection_timing["selection_seconds"] + final_retrain_seconds
+                amortized_development_seconds + final_retrain_seconds
             )
             run_summary = {
                 "dataset": manifest_summary["dataset"],
@@ -940,6 +916,9 @@ def main() -> None:
                 "epoch10_validation_macro_f1": recorded_history["validation_macro_f1"],
                 **metrics,
                 **selection_timing,
+                "support_development_seed": 42,
+                "support_development_shared_across_seeds": True,
+                "support_development_seconds_amortized": amortized_development_seconds,
                 "final_retrain_seconds": final_retrain_seconds,
                 "train_validation_seconds_total": train_validation_seconds_total,
                 **inference_timing,
@@ -964,7 +943,6 @@ def main() -> None:
             del model
             if device.type == "cuda":
                 torch.cuda.empty_cache()
-            aggregate_runs(out_dir, args.models, args.seeds)
 
     aggregate_runs(out_dir, args.models, args.seeds)
     print(f"Completed fixed-evaluation full-data experiment: {out_dir}", flush=True)

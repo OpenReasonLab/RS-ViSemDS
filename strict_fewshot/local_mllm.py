@@ -79,6 +79,7 @@ class TransformersVisionLLM:
             model_id,
             trust_remote_code=True,
             use_fast=False,
+            fix_mistral_regex=True,
         )
         try:
             import flash_attn  # noqa: F401
@@ -90,13 +91,8 @@ class TransformersVisionLLM:
             "InternVL attention backend: "
             + ("FlashAttention2" if self.use_flash_attn else "standard attention fallback")
         )
-        # InternVLChatModel does not expose all_tied_weights_keys in some
-        # Transformers versions, so accelerate's device_map="auto" path fails.
-        # The 8B model fits on a single GPU in bf16 on typical AutoDL cards.
-        internvl_device_map: str | dict[str, int] = device_map
-        if device_map == "auto":
-            internvl_device_map = {"": 0}
-
+        # Supply the missing tied-weight metadata while preserving the paper's
+        # requested device_map value ("auto" in the formal experiments).
         original_module_getattr = torch.nn.Module.__getattr__
 
         def patched_module_getattr(module, name):
@@ -115,7 +111,7 @@ class TransformersVisionLLM:
                 torch_dtype=self.torch_dtype,
                 low_cpu_mem_usage=True,
                 trust_remote_code=True,
-                device_map=internvl_device_map,
+                device_map=device_map,
                 use_flash_attn=self.use_flash_attn,
             ).eval()
         finally:

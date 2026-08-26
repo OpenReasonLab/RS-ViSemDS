@@ -1,0 +1,4 @@
+Task Instruction: Classify the target remote-sensing image into exactly one candidate class.
+
+Target Input: [Target image]
+Query: Classify the target image into exactly one candidate class.

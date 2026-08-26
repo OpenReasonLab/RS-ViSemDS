@@ -1,0 +1,11 @@
+Task Instruction: Use the visually retrieved labeled images below as visual reference examples to classify the target image.
+
+Visually Retrieved Demonstrations:
+[Top-1 kNN image]
+Labeled example 1/K. Ground-truth label: <TOP_1_LABEL>
+...
+[Top-K kNN image]
+Labeled example K/K. Ground-truth label: <TOP_K_LABEL>
+
+Target Input: [Target image]
+Query: Classify the target image into exactly one candidate class.

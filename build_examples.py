@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import time
 
 from strict_fewshot.utils import (
     read_csv,
@@ -21,6 +22,12 @@ def parse_args():
     parser.add_argument("--shots", nargs="+", type=int, default=[1, 3, 5, 10])
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--run-index",
+        type=int,
+        default=0,
+        help="Independent repetition index; random sampling uses seed + run_index.",
+    )
     parser.add_argument("--feature-backend", choices=["remoteclip", "image_stats"], default="remoteclip")
     parser.add_argument(
         "--knn-scope",
@@ -52,6 +59,7 @@ def write_examples(out_dir: Path, strategy: str, shot: int, rows: list[dict]) ->
     fieldnames = [
         "strategy", "shot", "target_id", "target_label", "target_path",
         "example_label", "example_path", "rank", "score", "sampling_seed",
+        "retrieval_seconds",
     ]
     write_csv(out_dir / f"examples_{strategy}_shot_{shot}.csv", rows, fieldnames)
 
@@ -82,6 +90,7 @@ def build_random(evaluation, support, classes, shots, out_dir, seed):
                     "rank": rank,
                     "score": "",
                     "sampling_seed": target_seed,
+                    "retrieval_seconds": "",
                 })
 
     for shot in unique_shots:
@@ -114,6 +123,9 @@ def build_knn(
 
     all_paths = [data_root / r["path"] for r in evaluation] + [data_root / r["path"] for r in support]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    feature_start = time.perf_counter()
     if backend == "image_stats":
         feats = extract_image_stats(all_paths)
         resolved_checkpoint = None
@@ -131,6 +143,9 @@ def build_knn(
             batch_size=feature_batch_size,
             num_workers=feature_num_workers,
         )
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    feature_seconds = time.perf_counter() - feature_start
 
     eval_feats = feats[:len(evaluation)]
     support_feats = feats[len(evaluation):]
@@ -154,8 +169,20 @@ def build_knn(
         raise ValueError(f"Support pool has {len(support)} images, need shot={max_shot}")
 
     rows_by_shot = {shot: [] for shot in unique_shots}
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    similarity_start = time.perf_counter()
     similarities = eval_feats @ support_feats.T
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    similarity_seconds = time.perf_counter() - similarity_start
+    amortized_preparation_seconds = (
+        (feature_seconds + similarity_seconds) / len(evaluation) if evaluation else 0.0
+    )
     for target_idx, target in enumerate(evaluation):
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+        ranking_start = time.perf_counter()
         if knn_scope == "per_class":
             ranked_by_class = []
             for class_name in classes:
@@ -169,6 +196,11 @@ def build_knn(
         else:
             values, indices = torch.topk(similarities[target_idx], k=max_shot)
             global_ranking = list(zip(values.tolist(), indices.tolist()))
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+        retrieval_seconds = amortized_preparation_seconds + (
+            time.perf_counter() - ranking_start
+        )
 
         for shot in unique_shots:
             if knn_scope == "per_class":
@@ -200,6 +232,7 @@ def build_knn(
                     "rank": rank,
                     "score": f"{value:.8f}",
                     "sampling_seed": "",
+                    "retrieval_seconds": f"{retrieval_seconds:.8f}",
                 })
 
     for shot in unique_shots:
@@ -225,6 +258,13 @@ def build_knn(
         "feature_num_workers": feature_num_workers,
         "checkpoint_file": resolved_checkpoint.name if resolved_checkpoint else None,
         "checkpoint_sha256": sha256_file(resolved_checkpoint) if resolved_checkpoint else None,
+        "timing_protocol": (
+            "per-target RemoteCLIP feature preparation amortized over evaluation queries, "
+            "plus similarity computation and target-specific Top-k ranking"
+        ),
+        "feature_preparation_seconds": feature_seconds,
+        "similarity_matrix_seconds": similarity_seconds,
+        "amortized_preparation_seconds_per_target": amortized_preparation_seconds,
     })
 
 
@@ -277,7 +317,16 @@ def main():
     evaluation, support, classes, data_root = load_manifest(manifest_dir)
 
     if args.strategy == "random":
-        build_random(evaluation, support, classes, args.shots, out_dir, args.seed)
+        if args.run_index < 0:
+            raise ValueError("--run-index must be non-negative")
+        build_random(
+            evaluation,
+            support,
+            classes,
+            args.shots,
+            out_dir,
+            args.seed + args.run_index,
+        )
     elif args.strategy == "knn":
         build_knn(
             evaluation, support, classes, args.shots, out_dir, data_root,

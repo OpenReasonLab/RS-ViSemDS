@@ -33,7 +33,7 @@ from strict_fewshot.utils import (
 
 
 INVALID_LABEL = "__INVALID__"
-OFFICIAL_OPENAI_BASE = "https://api.openai.com/v1"
+ZZZ_OPENAI_BASE = "https://api.zhizengzeng.com/v1"
 
 
 def parse_args():
@@ -45,16 +45,15 @@ def parse_args():
     parser.add_argument(
         "--api-base",
         default=(
-            os.environ.get("OPENAI_BASE_URL")
-            or os.environ.get("OPENAI_API_BASE")
+            os.environ.get("ZZZ_API_BASE")
             or os.environ.get("MLLM_API_BASE")
-            or OFFICIAL_OPENAI_BASE
+            or ZZZ_OPENAI_BASE
         ),
     )
     parser.add_argument(
         "--api-key",
         default=(
-            os.environ.get("OPENAI_API_KEY")
+            os.environ.get("ZZZ_API_KEY")
             or os.environ.get("MLLM_API_KEY")
             or ""
         ),
@@ -74,14 +73,14 @@ def parse_args():
         "--invalid-retries",
         type=int,
         default=0,
-        help="Optional non-paper retry count; the manuscript protocol uses 0.",
+        help="Formal protocol uses 0: an unmatchable response is counted incorrect.",
     )
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=42)
     parser.add_argument(
         "--prompt-mode",
         choices=("minimal", "guided"),
-        default="guided",
+        default="minimal",
         help="Use only the candidate list (minimal) or include dataset-specific visual cues (guided).",
     )
     parser.add_argument(
@@ -120,9 +119,11 @@ def image_to_data_url(path: Path, preserve_metadata: bool = False) -> str:
 
 SYSTEM_PROMPT = (
     "You are a remote-sensing scene classification assistant. Analyze only visible "
-    "content in the supplied overhead images. Do not use filenames, metadata, or "
-    "unstated context. Select exactly one label from the candidate list."
+    "content in the supplied overhead images. Select exactly one label from the "
+    "candidate list. Do not use filenames, metadata, or external information."
 )
+
+QUERY_INSTRUCTION = "Query: Classify the target image into exactly one candidate class."
 
 
 DATASET_CONSIDERATIONS = {
@@ -153,14 +154,14 @@ def format_class_options(class_order: list[str]) -> str:
     return "\n".join(f"- {label}" for label in class_order)
 
 
-def build_prompt(dataset: str, class_order: list[str], prompt_mode: str = "guided") -> str:
-    classes = ", ".join(class_order)
+def build_prompt(dataset: str, class_order: list[str], prompt_mode: str = "minimal") -> str:
     prompt = (
         "Task Instruction: Classify the target remote-sensing image into exactly one "
         "candidate class.\n\n"
-        f"Candidate Label Set: {classes}\n"
-        "Allowed answer strings must be copied exactly, including capitalization and underscores.\n\n"
-        "Target Input: the supplied image is the unlabeled target image.\n\n"
+        "Candidate Label Set:\n"
+        f"{format_class_options(class_order)}\n\n"
+        "Allowed answer strings must be copied exactly, including capitalization and "
+        "underscores.\n\n"
     )
     if prompt_mode == "guided":
         considerations = DATASET_CONSIDERATIONS.get(
@@ -169,10 +170,10 @@ def build_prompt(dataset: str, class_order: list[str], prompt_mode: str = "guide
         )
         prompt += f"Dataset-specific considerations: {considerations}\n\n"
     return prompt + (
-        "Query: Classify the target image into exactly one candidate class.\n\n"
-        "Output Format: Return exactly one compact JSON object and no other text: "
-        '{"thoughts":"<brief observable visual evidence>",'
-        '"answer":"<one candidate class>","score":<number from 0 to 1>}'
+        "Output Format: Return exactly one compact JSON object and no other text:\n"
+        '{"answer":"<one candidate class>","thoughts":"<brief observable visual '
+        'evidence>","score":<number from 0 to 1>}\n\n'
+        "Target Input:"
     )
 
 
@@ -217,16 +218,18 @@ def call_openai_compatible(
                 "content": [
                     {
                         "type": "text",
-                        "text": (
-                            build_prompt(dataset, class_order, prompt_mode)
-                            + (("\n\n" + extra_instruction) if extra_instruction else "")
-                        ),
+                        "text": build_prompt(dataset, class_order, prompt_mode),
                     },
                     {
                         "type": "image_url",
                         "image_url": {
                             "url": image_to_data_url(image_path, preserve_image_metadata)
                         },
+                    },
+                    {
+                        "type": "text",
+                        "text": QUERY_INSTRUCTION
+                        + (("\n\n" + extra_instruction) if extra_instruction else ""),
                     },
                 ],
             }
@@ -275,34 +278,36 @@ def extract_json_object(raw: str) -> dict | None:
 
 def parse_prediction(text: str, class_order: list[str]) -> dict:
     raw = text.strip()
-    data = extract_json_object(raw)
-    if data is not None:
-        for key in ("answer", "prediction", "predicted_label", "label", "class"):
-            value = data.get(key)
-            if not isinstance(value, str):
-                continue
-            normalized = match_class(value, class_order)
-            if normalized is not None:
-                score = data.get("score", data.get("confidence", ""))
-                if not isinstance(score, (int, float)) or not 0 <= score <= 1:
-                    score = ""
-                thoughts = data.get("thoughts", data.get("reason", ""))
-                return {
-                    "pred_label": normalized,
-                    "raw_pred_label": value,
-                    "parse_valid": 1,
-                    "parse_mode": "json",
-                    "score": score,
-                    "thoughts": thoughts if isinstance(thoughts, str) else str(thoughts),
-                }
+    try:
+        data = json.loads(raw)
+        parse_mode = "exact_json_answer"
+    except json.JSONDecodeError:
+        data = extract_json_object(raw)
+        parse_mode = "embedded_json_answer"
+    if isinstance(data, dict):
+        value = data.get("answer")
+        matched = match_class(value, class_order) if isinstance(value, str) else None
+        if matched is not None:
+            score = data.get("score", "")
+            if not isinstance(score, (int, float)) or not 0 <= score <= 1:
+                score = ""
+            thoughts = data.get("thoughts", "")
+            return {
+                "pred_label": matched,
+                "raw_pred_label": value,
+                "parse_valid": 1,
+                "parse_mode": parse_mode,
+                "score": score,
+                "thoughts": thoughts if isinstance(thoughts, str) else "",
+            }
 
-    normalized = match_class(raw, class_order)
-    if normalized is not None:
+    matched = match_class(raw, class_order)
+    if matched is not None:
         return {
-            "pred_label": normalized,
+            "pred_label": matched,
             "raw_pred_label": raw,
             "parse_valid": 1,
-            "parse_mode": "exact_text",
+            "parse_mode": "unique_label_match",
             "score": "",
             "thoughts": "",
         }
@@ -612,7 +617,7 @@ def main():
     invocation_start = time.perf_counter()
     if args.backend == "api" and not args.api_key:
         raise SystemExit(
-            "Missing API key. Set OPENAI_API_KEY or pass --api-key."
+            "Missing API key. Set ZZZ_API_KEY (recommended) or pass --api-key."
         )
     manifest_dir = repo_path(args.manifest_dir, Path.cwd())
     out_dir = repo_path(args.out_dir, Path.cwd())
@@ -638,11 +643,7 @@ def main():
 
     config = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "provider": (
-            "local_transformers"
-            if args.backend == "transformers"
-            else "openai" if args.api_base.rstrip("/") == OFFICIAL_OPENAI_BASE else "openai_compatible"
-        ),
+        "provider": "local_transformers" if args.backend == "transformers" else "zhizengzeng",
         "dataset": summary["dataset"],
         "manifest_dir": args.manifest_dir,
         "evaluation_sha256": sha256_file(manifest_dir / "evaluation.csv"),
@@ -710,13 +711,13 @@ def main():
     existing_rows = read_csv(predictions_path) if args.resume and predictions_path.exists() else []
     rows = [
         row for row in existing_rows
-        if not row.get("error") and int_value(row.get("parse_valid")) == 1
+        if not row.get("error")
     ]
     discarded_rows = len(existing_rows) - len(rows)
     if discarded_rows:
         print(
-            f"Resume discarded {discarded_rows} failed/invalid row(s); "
-            "those targets will be attempted again."
+            f"Resume discarded {discarded_rows} request-error row(s); "
+            "invalid model outputs remain complete and incorrect."
         )
     completed_ids = {row["target_id"] for row in rows}
     consecutive_request_errors = 0
@@ -751,18 +752,28 @@ def main():
             try:
                 if args.backend == "transformers":
                     assert local_model is not None
-                    messages = [{
-                        "role": "user",
-                        "content": [
-                            text_part(
-                                SYSTEM_PROMPT
-                                + "\n\n"
-                                + build_prompt(summary["dataset"], class_order, args.prompt_mode)
-                                + (("\n\n" + invalid_retry_note) if invalid_retry_note else "")
-                            ),
-                            image_part(),
-                        ],
-                    }]
+                    messages = [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": [
+                                text_part(
+                                    build_prompt(
+                                        summary["dataset"], class_order, args.prompt_mode
+                                    )
+                                ),
+                                image_part(),
+                                text_part(
+                                    QUERY_INSTRUCTION
+                                    + (
+                                        ("\n\n" + invalid_retry_note)
+                                        if invalid_retry_note
+                                        else ""
+                                    )
+                                ),
+                            ],
+                        },
+                    ]
                     raw_text = local_model.generate_from_messages(
                         messages, [load_rgb_image(image_path)]
                     )

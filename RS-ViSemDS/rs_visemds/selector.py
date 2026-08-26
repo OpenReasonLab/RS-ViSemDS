@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import math
 
 import numpy as np
 
@@ -142,6 +143,99 @@ def select_demonstrations(
     return ranked[:k], ranked
 
 
+def select_adaptive_demonstrations(
+    target_embedding: np.ndarray,
+    support_embeddings: np.ndarray,
+    support_labels: list[str],
+    category_prototypes: np.ndarray,
+    class_order: list[str],
+    candidate_indices: list[int],
+    weights: tuple[float, float, float],
+    k: int = 3,
+    eps: float = 1e-8,
+) -> tuple[list[ScoredCandidate], list[ScoredCandidate]]:
+    """Apply Eq. (14)-(15): pure global Top-k over the candidate pool.
+
+    R_i = alpha*S_img_norm + beta*S_typ_norm + gamma*S_sem_norm
+
+    Candidate generation is class balanced, but the paper explicitly does not
+    require the final demonstration list to be class balanced. Ties are resolved
+    by descending target-candidate visual relevance and then support index.
+    """
+    if k <= 0:
+        raise ValueError(f"k must be positive, got {k}")
+    if k > len(candidate_indices):
+        raise ValueError(f"k={k} exceeds candidate pool size {len(candidate_indices)}")
+    candidates = score_adaptive_candidates(
+        target_embedding=target_embedding,
+        support_embeddings=support_embeddings,
+        support_labels=support_labels,
+        category_prototypes=category_prototypes,
+        class_order=class_order,
+        candidate_indices=candidate_indices,
+        weights=weights,
+        eps=eps,
+    )
+    ranked = sorted(
+        candidates,
+        key=lambda row: (-row.score, -row.s_img, row.support_index),
+    )
+    return ranked[:k], ranked
+
+
+def score_adaptive_candidates(
+    target_embedding: np.ndarray,
+    support_embeddings: np.ndarray,
+    support_labels: list[str],
+    category_prototypes: np.ndarray,
+    class_order: list[str],
+    candidate_indices: list[int],
+    weights: tuple[float, float, float],
+    eps: float = 1e-8,
+) -> list[ScoredCandidate]:
+    _validate_inputs(target_embedding, support_embeddings, support_labels)
+    if not candidate_indices:
+        raise ValueError("candidate_indices must not be empty")
+    if category_prototypes.shape != (len(class_order), support_embeddings.shape[1]):
+        raise ValueError(
+            "category_prototypes must have shape "
+            f"({len(class_order)}, {support_embeddings.shape[1]})"
+        )
+    alpha, beta, gamma = _validate_weights(weights)
+    label_to_index = {label: index for index, label in enumerate(class_order)}
+    labels = [support_labels[index] for index in candidate_indices]
+    missing = sorted(set(labels) - set(label_to_index))
+    if missing:
+        raise ValueError(f"Candidate labels missing from class_order: {missing}")
+
+    candidate_embeddings = support_embeddings[candidate_indices]
+    text_embeddings = category_prototypes[
+        np.asarray([label_to_index[label] for label in labels], dtype=np.int64)
+    ]
+    s_img = candidate_embeddings @ target_embedding
+    s_typ = np.sum(candidate_embeddings * text_embeddings, axis=1)
+    s_sem = text_embeddings @ target_embedding
+    s_img_norm = min_max_normalize(s_img, eps)
+    s_typ_norm = min_max_normalize(s_typ, eps)
+    s_sem_norm = min_max_normalize(s_sem, eps)
+    final = alpha * s_img_norm + beta * s_typ_norm + gamma * s_sem_norm
+
+    return [
+        ScoredCandidate(
+            support_index=int(support_index),
+            label=labels[local_index],
+            s_img=float(s_img[local_index]),
+            s_typ=float(s_typ[local_index]),
+            s_sem=float(s_sem[local_index]),
+            s_img_norm=float(s_img_norm[local_index]),
+            s_typ_norm=float(s_typ_norm[local_index]),
+            s_sem_norm=float(s_sem_norm[local_index]),
+            score=float(final[local_index]),
+        )
+        for local_index, support_index in enumerate(candidate_indices)
+    ]
+
+
 def _validate_inputs(
     target_embedding: np.ndarray,
     support_embeddings: np.ndarray,
@@ -161,9 +255,8 @@ def _validate_weights(weights: tuple[float, float, float]) -> tuple[float, float
     if len(weights) != 3:
         raise ValueError("weights must contain alpha, beta, gamma")
     values = tuple(float(value) for value in weights)
-    if any(value < 0 for value in values):
-        raise ValueError(f"weights must be non-negative, got {values}")
+    if any(not math.isfinite(value) or not 0.0 <= value <= 1.0 for value in values):
+        raise ValueError(f"weights must be finite and in [0, 1], got {values}")
     if not np.isclose(sum(values), 1.0, atol=1e-7):
         raise ValueError(f"weights must sum to 1, got {values}")
     return values
-

@@ -1,0 +1,29 @@
+System Prompt: You are a remote-sensing scene classification assistant. Analyze only
+visible content in the supplied overhead images. Select exactly one label from the
+candidate list.
+
+Task Instruction: The selected labeled images below are the only positive
+classification evidence. Compare the target with the reference examples as complete
+scenes.
+
+Candidate Label Set: <DATASET_CANDIDATE_CLASSES>. Allowed answer strings must be
+copied exactly, including capitalization and underscores.
+
+Boundary-aware Category Rules:
+Stage A: Compare the target with the demonstrations as complete scenes and identify
+the provisional label P and runner-up R. If P is a clear match, return P. Stage B:
+Only if P and R remain ambiguous, apply exactly one P-versus-R exclusion check. Keep
+P unless clear scene-level counterevidence contradicts it and the target remains
+consistent with R. The check cannot positively support a label or introduce a third
+label.
+<DATASET_BOUNDARY_RULES>
+
+Visual-Semantic Demonstrations:
+<SCORE_ORDERED_LABELED_IMAGES>
+
+Target Input: <TARGET_IMAGE>
+
+Query: Classify the target image into exactly one candidate class.
+
+Output Format: Return exactly one compact JSON object and no other text:
+{"answer":"<one candidate class>","thoughts":"<brief observable visual evidence>","score":<number from 0 to 1>}

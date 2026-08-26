@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import os
@@ -25,7 +25,6 @@ def parse_args() -> argparse.Namespace:
         default=(
             os.environ.get("OPENAI_BASE_URL")
             or os.environ.get("OPENAI_API_BASE")
-            or os.environ.get("MLLM_API_BASE")
             or "https://api.openai.com/v1"
         ),
     )
@@ -33,7 +32,6 @@ def parse_args() -> argparse.Namespace:
         "--api-key",
         default=(
             os.environ.get("OPENAI_API_KEY")
-            or os.environ.get("MLLM_API_KEY")
             or ""
         ),
     )
@@ -118,18 +116,16 @@ def backend_args(args: argparse.Namespace) -> list[str]:
 
 def main() -> None:
     args = parse_args()
-    code_root = Path(__file__).resolve().parent
-    root = Path(os.environ.get("PROJECT_ROOT", code_root)).resolve()
-    os.chdir(root)
+    root = Path.cwd()
 
     if args.backend == "api" and not args.api_key and not args.dry_run:
         raise SystemExit("Missing API key. Set OPENAI_API_KEY or pass --api-key.")
     if args.backend == "transformers" and not args.dry_run:
         require_dir(Path(args.model))
 
-    zero_script = code_root / "run_zero_shot_mllm.py"
-    random_script = code_root / "run_random_fewshot_mllm.py"
-    knn_script = code_root / "run_knn_totalshot_mllm.py"
+    zero_script = root / "run_zero_shot_mllm.py"
+    random_script = root / "run_random_fewshot_mllm.py"
+    knn_script = root / "run_knn_totalshot_mllm.py"
     if not args.skip_zero:
         require_file(zero_script)
     if not args.skip_random:

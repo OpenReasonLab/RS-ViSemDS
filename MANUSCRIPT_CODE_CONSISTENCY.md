@@ -1,40 +1,49 @@
-# Manuscript-Code Consistency Audit
+# Manuscript–Code Consistency Audit
 
-Reference manuscript: `RS-ViSemDS_Manuscript.pdf`, modified 2026-07-20.
+Reference manuscript: `2027IEEE顶刊遥感图像分类 (5).pdf`.
 
-## Aligned Protocols
+## Aligned protocols
 
-| Item | Manuscript protocol | Packaged code |
+| Item | Manuscript protocol | Packaged implementation |
 |---|---|---|
-| Test split | 100 images per class, seed 42 | Fixed seed-42 manifests; validator checks class counts and support/test disjointness |
-| AID | 10 classes, 1000 test, 2210 support | `configs/aid.json` and `manifests/aid_eval100_seed42/` |
-| NWPU-Urban | 8 classes, 800 test, 4800 support | `configs/nwpu_fg_urban.json` and `manifests/nwpu_eval100_seed42/` |
-| MLLM inference | Frozen parameters, bfloat16, automatic device mapping, greedy decoding, 256 new tokens | Shared Transformers backend and all open-model launchers |
-| Context isolation | One fresh context per target; no filename or metadata | Each target builds a new message list; images are decoded and metadata is removed for API calls |
-| Random few-shot | Total k examples sampled from support | `build_examples.py` plus `run_random_fewshot_mllm.py` |
-| Visual kNN MLLM | Global top-k support images from normalized RemoteCLIP image similarity | `build_examples.py --feature-backend remoteclip` plus `run_knn_totalshot_mllm.py` |
-| Conventional few-shot | Per-class kNN with the corresponding frozen ImageNet backbone | `build_backbone_knn_examples.py`; one model-specific selection directory per backbone |
-| Conventional training | Head only, 10 epochs, batch 16, Adam, lr 0.001, cross entropy, 224x224, seed 42 | `run_strict_baselines.py` and `run_all_per_class_fewshot.py` defaults |
-| Full data | Seed 42; 90/10 support validation; reinitialize head; full-support retraining for 10 epochs; final test once | `run_full_data_fixed_eval.py` and `run_full_data_fixed_eval_all.py` default to seed 42 and enforce 10 epochs |
-| RS-ViSemDS retrieval | RemoteCLIP, r=3 per class, final total k=3 | `build_rs_visemds_examples.py` and main runner defaults |
-| RS-ViSemDS weights | alpha=0.6, beta=0.2, gamma=0.2 | Builder defaults and main runner explicit arguments |
-| RS-ViSemDS prompt | Demonstrations as positive evidence; Stage A P/R; Stage B one conservative boundary check | `manuscript_v1`, explicitly passed by the main runner |
-| GPT-4o | Official OpenAI API | Official API base is the default; compatible endpoints require an explicit override |
-| Invalid MLLM output | Counted as incorrect | Main evaluator defaults use zero invalid-output retries |
-| Metrics | Accuracy and macro precision, recall, F1 | Shared metric summaries use macro averaging |
-| Timing | Full-data inference uses batch 1 end-to-end; retrieval methods include retrieval/selection/prompt/generation | Timing fields and run metadata encode these scopes |
+| Fixed evaluation split | Seed 42; 100 test images per class | Validator checks class counts, recorded seed, and support/test disjointness |
+| AID | 10 classes; 1,000 test; 2,210 support | `configs/aid.json`; `manifests/aid_eval100_seed42/` |
+| NWPU-Urban | 8 classes; 800 test; 4,800 support | `configs/nwpu_fg_urban.json`; `manifests/nwpu_eval100_seed42/` |
+| Repeated experiments | Arithmetic mean over ten runs | Formal launchers use ten distinct run directories; `aggregate_paper_runs.py` requires exactly ten |
+| MLLM inference | Frozen parameters, bfloat16, automatic device mapping, greedy decoding, at most 256 new tokens | Shared local backend and `run_mllm_paper_runs.py` enforce these settings |
+| Context isolation | One fresh context per target; no filename, metadata, or external information | Each target builds a new message list and supplies only image content and prompt text |
+| Baseline prompts | Figure 8 role, task, label set, demonstrations, target, query, and JSON output contract | Shared prompt builders and public text templates under `prompts/` |
+| Invalid output | A unique candidate-label match is accepted; otherwise counted incorrect | Shared parser; formal launcher disables invalid-output regeneration |
+| Random few-shot | Total `k` support examples; independently resampled every run | Run-index 0–9 rebuilds examples with seeds 42–51 |
+| Visual kNN MLLM | Global top-`k` support images from normalized RemoteCLIP image similarity | `build_examples.py --feature-backend remoteclip`; `run_knn_totalshot_mllm.py` |
+| Conventional few-shot | Class-balanced RemoteCLIP retrieval; frozen ImageNet backbone; head-only fitting | `run_all_per_class_fewshot.py` builds one shared per-class RemoteCLIP selection and runs seeds 42–51 |
+| Conventional training | 10 epochs, batch 16, Adam, lr 0.001, cross entropy, 224×224 | `run_strict_baselines.py` defaults |
+| Full data | One seed-42 support-only 90/10 development split; reinitialize head; train complete support for 10 epochs | `run_full_data_fixed_eval.py`; final runs use seeds 42–51 |
+| RS-ViSemDS retrieval | Complete class support, RemoteCLIP, `r=3` per class, global final `k=3`, exclude held-out query from candidates and visual reference | Builder and runner validation enforce these rules |
+| RS-ViSemDS fusion | Separately calibrated visual/semantic temperatures; JSD; logit fusion; base prior `(0.6, 0.2, 0.2)` | Formal defaults and run metadata record temperatures, divergence, logits, and weights |
+| RS-ViSemDS prompt | Demonstrations as positive evidence; Stage A prototype/relevance; Stage B one conservative boundary check | `manuscript_v1` prompt mode |
+| GPT-4o | Official OpenAI API | Official API base is the default; compatible endpoints require explicit override |
+| Metrics | Accuracy, macro Precision, macro Recall, macro F1 | All baseline and method summaries expose the same four measures |
+| Retrieval timing | Retrieval, selection, prompt construction, and generation are included | RemoteCLIP builder records per-target retrieval time; kNN evaluator adds it to end-to-end time |
 
-## Corrections Made During This Audit
+## Corrections implemented
 
-1. Replaced the incorrect traditional RemoteCLIP per-class retrieval path with model-specific ImageNet-backbone retrieval.
-2. Added the exact manuscript-oriented RS-ViSemDS prompt mode and made it the explicit main-suite default.
-3. Changed full-data default seeds from three seeds to manuscript seed 42.
-4. Changed GPT-4o's default from a third-party compatible endpoint to the official OpenAI endpoint.
-5. Removed all precomputed traditional retrieval CSVs and made generated-example directories output-only.
-6. Strengthened package validation to reject results, logs, caches, weights, archives, and generated example files.
+1. Added one canonical ten-run MLLM launcher and independent Random resampling.
+2. Replaced stale backbone-specific conventional retrieval in the manuscript entry point with class-balanced RemoteCLIP retrieval.
+3. Changed conventional and full-data final evaluation from a single run to ten independent seeds and four-metric arithmetic-mean aggregation.
+4. Matched the Figure 8 prompt order and output contract; corrected the invalid-output retry path.
+5. Added macro Precision and macro Recall to all shared summaries.
+6. Included RemoteCLIP retrieval cost in retrieval-based MLLM timing.
+7. Made the full-data development split one shared seed-42 support-only procedure, followed by complete-support retraining.
+8. Preserved automatic device mapping for local MLLMs and enabled the InternVL tokenizer compatibility option.
+9. Corrected public category-description punctuation to the manuscript wording and documented the fixed RS-ViSemDS prior.
+10. Kept API credentials environment-only and removed results, caches, logs, checkpoints, and generated selections from the public package.
 
-## Disclosure Note
+## Manuscript ambiguities recorded explicitly
 
-The manuscript states the full-data split, seed, epoch count, and initial learning rate, but does not enumerate every implementation detail of that protocol. The code additionally records its batch size, AdamW optimizer, weight decay, augmentation, and validation-driven learning-rate schedule in each run configuration. These are implementation details, not hidden packaged results. For exact reproducibility, they should either remain frozen in code or be added to the manuscript/supplementary material.
+- The full-data prose mentions five seeds, while the table and global reporting statement specify ten runs. The formal code follows ten runs (seeds 42–51) and records all per-run results.
+- The traditional few-shot equation can be read as using each backbone for retrieval, while the experiment prose explicitly names RemoteCLIP. The canonical manuscript entry follows the experiment prose; the older backbone-specific builder is retained only as non-paper historical/ablation code.
+- The manuscript requires separate temperature calibration but does not disclose its optimization objective or subset size. The code uses a support-only class-balanced subset and NLL, and records the subset, bounds, objective, and fitted values. It does not claim these missing choices were specified by the manuscript.
+- The category-description generation workflow does not disclose a complete selection objective. The public descriptions are fixed inputs matching the manuscript; no undisclosed generation objective is invented.
 
-This package contains no experiment outputs or numerical performance tables.
+The package contains no experiment outputs or numerical result tables.

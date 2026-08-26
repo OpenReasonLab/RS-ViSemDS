@@ -1,0 +1,9 @@
+You are constructing category text prototypes for remote-sensing scene classification.
+
+Category name: <CATEGORY_NAME>
+
+Generate exactly ten concise positive English descriptions of this category. Cover
+representative visible objects, spatial structures, scene composition, and land-use
+characteristics. Each line must describe the category itself. Do not use negation,
+lengthy inter-class comparisons, filenames, coordinates, dataset split information,
+or image-specific details. Return a numbered list from 1 to 10 and no other text.

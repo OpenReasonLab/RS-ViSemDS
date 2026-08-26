@@ -1,0 +1,21 @@
+You are constructing conservative boundary-aware rules for remote-sensing scene
+classification. The material below comes only from a small class-balanced
+development subset of the labeled support pool.
+
+Candidate labels:
+<CANDIDATE_LABELS>
+
+For each development image, the following fields are provided:
+- ground-truth label
+- zero-shot prediction and observable-evidence summary
+- random few-shot prediction and observable-evidence summary
+- visual-kNN prediction and observable-evidence summary
+
+Development records:
+<SUPPORT_ONLY_DEVELOPMENT_RECORDS>
+
+Identify recurring confusion pairs. For every candidate label, write one concise
+boundary-aware rule grounded in visible visual, spatial, structural, and functional
+differences. The rule may reject a label when clear counterevidence is visible, but
+must not use hidden metadata, target-test examples, or instance-specific corrections.
+Return exactly one line per label as `<LABEL>: <RULE>` and no other text.

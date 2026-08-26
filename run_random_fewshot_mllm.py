@@ -27,6 +27,7 @@ from strict_fewshot.utils import (
 from run_zero_shot_mllm import (
     DATASET_CONSIDERATIONS,
     INVALID_LABEL,
+    QUERY_INSTRUCTION,
     SYSTEM_PROMPT,
     extract_text,
     format_class_options,
@@ -41,7 +42,7 @@ from run_zero_shot_mllm import (
 )
 
 
-OFFICIAL_OPENAI_BASE = "https://api.openai.com/v1"
+ZZZ_OPENAI_BASE = "https://api.zhizengzeng.com/v1"
 
 
 class ProviderResponseError(RuntimeError):
@@ -59,11 +60,11 @@ def parse_args():
     parser.add_argument("--backend", choices=("api", "transformers"), default="api")
     parser.add_argument(
         "--api-base",
-        default=os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE") or os.environ.get("MLLM_API_BASE") or OFFICIAL_OPENAI_BASE,
+        default=os.environ.get("ZZZ_API_BASE") or os.environ.get("MLLM_API_BASE") or ZZZ_OPENAI_BASE,
     )
     parser.add_argument(
         "--api-key",
-        default=os.environ.get("OPENAI_API_KEY") or os.environ.get("MLLM_API_KEY") or "",
+        default=os.environ.get("ZZZ_API_KEY") or os.environ.get("MLLM_API_KEY") or "",
     )
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-tokens", type=int, default=256)
@@ -85,7 +86,7 @@ def parse_args():
         "--invalid-retries",
         type=int,
         default=0,
-        help="Optional non-paper retry count; the manuscript protocol uses 0.",
+        help="Regenerate once when the model response cannot be parsed as one candidate class.",
     )
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=42)
@@ -103,11 +104,16 @@ def build_task_prompt(
     prompt_mode: str,
 ) -> str:
     prompt = (
-        "Task Instruction: Use the randomly sampled labeled images below as visual "
-        "reference examples to classify the target image.\n\n"
-        f"Candidate Label Set: {', '.join(class_order)}\n"
-        "Allowed answer strings must be copied exactly, including capitalization and underscores.\n\n"
-        f"Randomly Sampled Demonstrations: {shot} labeled image(s) follow.\n\n"
+        "Task Instruction: Use the randomly sampled labeled images below as visual reference "
+        "examples to classify the target image.\n\n"
+        "Candidate Label Set:\n"
+        f"{format_class_options(class_order)}\n\n"
+        "Allowed answer strings must be copied exactly, including capitalization and "
+        "underscores.\n\n"
+        "Output Format: Return exactly one compact JSON object and no other text:\n"
+        '{"answer":"<one candidate class>","thoughts":"<brief observable visual '
+        'evidence>","score":<number from 0 to 1>}\n\n'
+        f"Randomly Sampled Demonstrations: {shot}"
     )
     if prompt_mode == "guided":
         prompt += (
@@ -115,12 +121,7 @@ def build_task_prompt(
             + DATASET_CONSIDERATIONS.get(dataset, "Inspect scene layout, objects, texture, and context.")
             + "\n\n"
         )
-    return prompt + (
-        "Query: Classify the target image into exactly one candidate class.\n\n"
-        "Output Format: Return exactly one compact JSON object and no other text: "
-        '{"thoughts":"<brief observable visual evidence>",'
-        '"answer":"<one candidate class>","score":<number from 0 to 1>}'
-    )
+    return prompt
 
 
 def build_content(
@@ -144,10 +145,6 @@ def build_content(
     for index, example in enumerate(examples, start=1):
         content.extend([
             {
-                "type": "text",
-                "text": f"Labeled example {index}/{len(examples)}. Ground-truth label: {example['example_label']}",
-            },
-            {
                 "type": "image_url",
                 "image_url": {
                     "url": image_to_data_url(
@@ -155,12 +152,17 @@ def build_content(
                     )
                 },
             },
+            {
+                "type": "text",
+                "text": f"Labeled example {index}/{len(examples)}. Ground-truth label: {example['example_label']}",
+            },
         ])
     content.extend([
         {
             "type": "text",
-            "text": "Target Input: the next image is the unlabeled target image.",
+            "text": "Target Input:",
         },
+        {"type": "text", "text": QUERY_INSTRUCTION},
         {
             "type": "image_url",
             "image_url": {
@@ -186,7 +188,7 @@ def build_local_messages_and_images(
 
     content = [
         text_part(
-            SYSTEM_PROMPT + "\n\n" + build_task_prompt(
+            build_task_prompt(
                 dataset,
                 class_order,
                 len(examples),
@@ -196,17 +198,23 @@ def build_local_messages_and_images(
     ]
     for index, example in enumerate(examples, start=1):
         content.extend([
+            image_part(),
             text_part(
                 f"Labeled example {index}/{len(examples)}. "
                 f"Ground-truth label: {example['example_label']}"
             ),
-            image_part(),
         ])
     content.extend([
-        text_part("Target Input: the next image is the unlabeled target image."),
+        text_part(
+            "Target Input:"
+        ),
         image_part(),
+        text_part(QUERY_INSTRUCTION),
     ])
-    return [{"role": "user", "content": content}], loaded_images
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": content},
+    ], loaded_images
 
 
 def call_openai_compatible(
@@ -352,7 +360,7 @@ def main():
     args = parse_args()
     invocation_start = time.perf_counter()
     if args.backend == "api" and not args.api_key:
-        raise SystemExit("Missing API key. Set OPENAI_API_KEY or pass --api-key.")
+        raise SystemExit("Missing API key. Set ZZZ_API_KEY or pass --api-key.")
     manifest_dir = repo_path(args.manifest_dir, Path.cwd())
     examples_csv = repo_path(args.examples_csv, Path.cwd())
     out_dir = repo_path(args.out_dir, Path.cwd())
@@ -383,11 +391,7 @@ def main():
 
     config = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        "provider": (
-            "local_transformers"
-            if args.backend == "transformers"
-            else "openai" if args.api_base.rstrip("/") == OFFICIAL_OPENAI_BASE else "openai_compatible"
-        ),
+        "provider": "local_transformers" if args.backend == "transformers" else "zhizengzeng",
         "dataset": summary["dataset"],
         "strategy": "random",
         "shot": shot,
@@ -458,7 +462,7 @@ def main():
     existing_rows = read_csv(predictions_path) if args.resume and predictions_path.exists() else []
     rows = [
         row for row in existing_rows
-        if not row.get("error") and int_value(row.get("parse_valid")) == 1
+        if not row.get("error")
     ]
     discarded_rows = len(existing_rows) - len(rows)
     if discarded_rows:
@@ -496,7 +500,7 @@ def main():
                         examples, args.prompt_mode, args.model, args.local_image_mode,
                     )
                     if invalid_retry_note:
-                        messages[0]["content"].append(text_part(invalid_retry_note))
+                        messages[1]["content"].append(text_part(invalid_retry_note))
                     raw_text = local_model.generate_from_messages(messages, images)
                     response = {"model": args.model, "backend": "transformers"}
                 else:

@@ -17,6 +17,8 @@ def summarize_predictions(rows: list[dict], class_order: list[str]) -> tuple[dic
         avg_predict_seconds = _mean_float(model_rows, "predict_seconds")
         avg_total_seconds = _mean_float(model_rows, "total_seconds")
         per_class_acc = {}
+        precision_values = []
+        recall_values = []
         f1_values = []
         matrix = [[0 for _ in class_order] for _ in class_order]
         class_to_idx = {c: i for i, c in enumerate(class_order)}
@@ -34,6 +36,8 @@ def summarize_predictions(rows: list[dict], class_order: list[str]) -> tuple[dic
             recall = tp / support if support else 0.0
             precision = tp / pred_count if pred_count else 0.0
             f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+            precision_values.append(precision)
+            recall_values.append(recall)
             per_class_acc[cls] = recall
             f1_values.append(f1)
             per_class_rows.append({
@@ -48,6 +52,12 @@ def summarize_predictions(rows: list[dict], class_order: list[str]) -> tuple[dic
         summary[model] = {
             "num_targets": total,
             "overall_accuracy": correct / total if total else 0.0,
+            "macro_precision": (
+                sum(precision_values) / len(precision_values) if precision_values else 0.0
+            ),
+            "macro_recall": (
+                sum(recall_values) / len(recall_values) if recall_values else 0.0
+            ),
             "macro_f1": sum(f1_values) / len(f1_values) if f1_values else 0.0,
             "avg_train_seconds_per_target": avg_train_seconds,
             "avg_predict_seconds_per_target": avg_predict_seconds,

@@ -1,18 +1,18 @@
 # RS-ViSemDS: Visual-Semantic Demonstration Selection for Remote Sensing Scene Classification with Open-Weight Multimodal Large Language Models
 
 <p align="center">
-  <a href="assets/fig02_datasets_models_baseline_protocols.pdf">📄 Figure 1: Datasets, Models, and Baseline Protocols</a>
+  <a href="assets/fig02_datasets_models_baseline_protocols.pdf">📄 Figure 2: Datasets, Models, and Baseline Protocols</a>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  <a href="assets/fig03_rs_visemds_framework.pdf">🧩 Figure 2: RS-ViSemDS Framework</a>
+  <a href="assets/fig03_rs_visemds_framework.pdf">🧩 Figure 3: RS-ViSemDS Framework</a>
 </p>
 
-This repository provides the experimental reproduction code for the paper **RS-ViSemDS**. It follows the final evaluation protocol used in the manuscript, with **100 fixed test images per class and random seed 42**.
+本仓库提供论文 **RS-ViSemDS** 的实验复现代码。固定评估划分由 seed 42 生成（每类 100 张测试图像）；论文表格中的性能指标均为十次独立运行的算术平均。正式入口和不可混用的历史入口见 `PAPER_REPRODUCTION.md`。
 
-This package contains only source code, configuration files, fixed data-split manifests, tests, execution scripts, and the two protocol figures linked above. It does **not** include the original images, model weights, RemoteCLIP caches, pre-generated demonstrations, predictions, metric files, confusion matrices, experimental plots, logs, or checkpoints. All retrieval files required for the experiments are generated locally by the code.
+本代码包仅包含源代码、配置文件、固定数据划分 manifest、测试、运行脚本以及上方两张论文协议图，不包含原始图像、模型权重、RemoteCLIP 缓存、预生成示例、预测结果、指标文件、混淆矩阵、实验结果图表、日志或检查点。运行实验所需的检索文件均由代码在本地生成。
 
-## 🧭 1. Experimental Scope
+## 🧭 1. 实验范围
 
-### MLLM Baselines
+### MLLM 基线
 
 - GPT-4o
 - Llama-3.2-11B-Vision-Instruct
@@ -22,93 +22,94 @@ This package contains only source code, configuration files, fixed data-split ma
 - InternVL3.5-8B
 - InternVL3.5-14B
 
-The following settings are supported:
+支持以下设置：
 
 - Zero-shot
 - Random few-shot
-- Global RemoteCLIP visual-kNN few-shot
+- 全局 RemoteCLIP visual-kNN few-shot
 
-### Conventional Visual Baselines
+### 传统视觉基线
 
 - ResNet-18
 - ResNet-50
 - ViT-Tiny
 - ViT-Small
 
-The repository supports target-specific, class-wise kNN few-shot learning and full-data head-only transfer learning. For conventional few-shot learning, each model uses its own frozen ImageNet-pretrained backbone to extract retrieval features. RemoteCLIP is not used, and the training images are not randomly sampled from each class.
+支持逐目标、逐类别 RemoteCLIP kNN few-shot 以及 full-data head-only transfer learning。RemoteCLIP 负责检索类平衡示例，四个 ImageNet 预训练骨干保持冻结并只训练分类头。
 
 ### RS-ViSemDS
 
-The main experiments are conducted with the following three open-weight MLLMs:
+主实验在以下三个开源 MLLM 上运行：
 
 - Gemma-3-12B
 - Qwen3-VL-8B
 - InternVL3.5-14B
 
-## 🗂️ 2. Repository Structure
+## 🗂️ 2. 代码结构
 
 ```text
-configs/                         Dataset and category configurations
-assets/                          Paper Figures 1 and 2 in PDF format
-data_raw/                        Raw dataset directory; empty in the release package
-examples/                        Runtime-generated Random/kNN demonstration files
-manifests/                       Fixed seed-42 data splits used in the paper
-strict_fewshot/                  Shared components for data, models, metrics, features, and MLLMs
-RS-ViSemDS/                      RS-ViSemDS selection, prompting, inference, and test code
-build_examples.py                MLLM Random/global-kNN demonstration generator
-build_backbone_knn_examples.py   Per-class backbone-kNN generator for conventional visual models
-prepare_eval100_protocol.py      Unified preparation entry point for MLLM demonstrations
-run_*_aid_nwpu_all.py            Unified AID/NWPU entry points for individual MLLMs
-run_all_per_class_fewshot.py     Unified entry point for the four conventional few-shot models
-run_full_data_fixed_eval_all.py  Unified entry point for the four full-data models
-verify_package.py                Integrity checker for data splits and the code-only release package
+configs/                         数据集与类别配置
+assets/                          论文 Figure 2/3 PDF
+data_raw/                        原始数据目录，发布包中为空
+examples/                        运行时生成的 Random/kNN 示例目录
+manifests/                       论文使用的 seed-42 固定数据划分
+strict_fewshot/                  数据、模型、指标、特征与 MLLM 公共组件
+RS-ViSemDS/                      RS-ViSemDS 选择、提示、推理与测试代码
+build_examples.py                MLLM Random/global-kNN 示例生成器
+prepare_eval100_protocol.py      MLLM 示例统一准备入口
+run_mllm_paper_runs.py           MLLM 十次正式运行与聚合入口
+aggregate_paper_runs.py          四项指标的十次算术平均聚合器
+run_*_aid_nwpu_all.py            各 MLLM 的 AID/NWPU 统一入口
+run_all_per_class_fewshot.py     四个传统 few-shot 模型统一入口
+run_full_data_fixed_eval_all.py  四个 full-data 模型统一入口
+verify_package.py                数据划分与纯代码包完整性校验器
 ```
 
-A detailed manuscript–code consistency audit is provided in `MANUSCRIPT_CODE_CONSISTENCY.md`. Random seeds and dataset sources are documented in `SEEDS_AND_DATASETS.md`, and the GitHub upload scope and excluded files are listed in `GITHUB_UPLOAD_CHECKLIST.md`.
+论文与代码的逐项核查记录见 `MANUSCRIPT_CODE_CONSISTENCY.md`，随机种子和数据集来源见 `SEEDS_AND_DATASETS.md`，GitHub 上传范围与排除项见 `GITHUB_UPLOAD_CHECKLIST.md`。
 
-## 🔒 3. Fixed Evaluation Protocol
+## 🔒 3. 固定评估协议
 
 | Dataset | Classes | Test images per class | Test total | Support pool |
 |---|---:|---:|---:|---:|
 | AID | 10 | 100 | 1000 | 2210 |
 | NWPU-Urban | 8 | 100 | 800 | 4800 |
 
-- The fixed random seed is `42`.
-- AID manifest: `manifests/aid_eval100_seed42/`.
-- NWPU-Urban manifest: `manifests/nwpu_eval100_seed42/`.
-- The test set and support pool are strictly disjoint.
-- Test images are never used as retrieval candidates, training or validation samples, or for hyperparameter tuning and model selection. They are used only as target queries for retrieval and final evaluation.
-- The earlier protocol with 24 test images per class and its associated results are not included in this package.
+- 固定随机种子为 `42`。
+- AID manifest：`manifests/aid_eval100_seed42/`。
+- NWPU-Urban manifest：`manifests/nwpu_eval100_seed42/`。
+- 测试集与 support pool 严格不重叠。
+- 测试图像只用于最终评估，不参与示例检索、训练、内部验证、调参或模型选择。
+- 旧的每类 24 张测试图像协议及其结果没有放入本包。
 
-> ⚠️ Do not regenerate the manifests with a new random split; otherwise, the resulting test sets will no longer match those used in the paper.
+> ⚠️ 不要重新随机生成 manifest，否则将不再对应论文使用的固定测试集。
 
-## 🧰 4. Data and Environment Preparation
+## 🧰 4. 准备数据与环境
 
-Dataset download links are provided in `SEEDS_AND_DATASETS.md`. After downloading and extracting the datasets, place the class directories under:
+数据集下载地址见 `SEEDS_AND_DATASETS.md`。下载并解压后，将类别目录放入：
 
 ```text
 data_raw/AID_dataset/
 data_raw/NWPU-RESISC45/
 ```
 
-The class-directory names must match the `source_directory` entries in `configs/*.json` and the manifests.
+类别目录名称必须与 `configs/*.json` 及 manifest 中的 `source_directory` 一致。
 
-Install the shared dependencies:
+安装公共依赖：
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-For locally deployed MLLMs, install compatible versions of `transformers`, `accelerate`, and the corresponding visual dependencies according to the official model requirements. FlashAttention2 is optional. If it is unavailable, the models can fall back to standard attention, although inference speed and GPU memory usage may differ.
+本地 MLLM 还应根据模型官方要求安装兼容版本的 `transformers`、`accelerate` 和相关视觉依赖。FlashAttention2 为可选加速项；未安装时模型可回退到标准 attention，但速度和显存占用可能不同。
 
-## 🔎 5. Generating MLLM Few-Shot Demonstrations
+## 🔎 5. 生成 MLLM Few-Shot 示例
 
-For MLLM Random and visual-kNN prompting, `k` denotes the **total number of demonstrations used for each target image**, not the number of demonstrations per class.
+MLLM 的 Random 和 visual-kNN 中，`k` 表示每个目标图像使用的示例总数，而不是每类示例数。
 
-- Random: for each target image, a total of `k` images are sampled from the complete support pool using seed 42.
-- Visual kNN: a frozen RemoteCLIP image encoder retrieves the global top-`k` images from the complete support pool.
+- Random：每次运行从完整 support pool 中为每个目标重新采样总计 `k` 张图像；十次正式运行使用 seeds 42–51。
+- Visual kNN：使用冻结的 RemoteCLIP 图像编码器，从完整 support pool 中检索全局 top-`k` 图像。
 
-After preparing the datasets and RemoteCLIP weights, run:
+数据与 RemoteCLIP 权重就位后运行：
 
 ```bash
 python prepare_eval100_protocol.py \
@@ -118,22 +119,25 @@ python prepare_eval100_protocol.py \
   --remoteclip-checkpoint /path/to/RemoteCLIP-ViT-B-32.pt
 ```
 
-The `--skip-manifests` option preserves the fixed data splits provided with the package. The generated CSV files and feature caches are runtime artifacts and are not included in the release package.
+`--skip-manifests` 会保留包内的论文固定划分。生成的 CSV 和特征缓存属于运行产物，不包含在发布包中。
 
-## 🤖 6. Running the MLLM Baselines
+## 🤖 6. 运行 MLLM 基线
 
-All locally deployed open-weight models use frozen parameters, `bfloat16`, automatic device mapping, greedy decoding, `do_sample=False`, and `max_new_tokens=256`. Each target image is evaluated with an independent context, and no filename, ground-truth label, or image metadata is provided as input.
+本地开源模型统一采用冻结参数、`bfloat16`、自动设备映射、贪心解码、`do_sample=False` 和 `max_new_tokens=256`。每张目标图像使用独立的新上下文，输入中不提供文件名、真实标签或图像元数据。
 
-Example for InternVL3.5-14B:
+正式实验必须使用十次运行入口。以 InternVL3.5-14B 为例：
 
 ```bash
-python run_internvl35_14b_aid_nwpu_all.py \
+python run_mllm_paper_runs.py \
   --model /path/to/InternVL3.5-14B \
+  --model-alias internvl35_14b \
+  --backend transformers \
   --datasets aid nwpu_fg_urban \
-  --shots 1 3 5 10
+  --methods zero random knn \
+  --shots 3 --runs 10 --resume
 ```
 
-Entry points for the other open-weight models:
+`run_*_aid_nwpu_all.py` 是模型专用的单次运行/环境调试入口，不直接产生论文十次均值。支持的模型专用入口包括：
 
 ```text
 run_llama32_11b_aid_nwpu_all.py
@@ -143,21 +147,24 @@ run_qwen3vl_8b_aid_nwpu_all.py
 run_internvl35_8b_aid_nwpu_all.py
 ```
 
-GPT-4o uses the official OpenAI API by default:
+GPT-4o 默认使用官方 OpenAI API：
 
 ```bash
 export OPENAI_API_KEY="your-key"
-python run_gpt4o_aid_nwpu_all.py \
+python run_mllm_paper_runs.py \
   --model gpt-4o \
+  --model-alias gpt4o \
+  --backend api \
   --datasets aid nwpu_fg_urban \
-  --shots 3 5 10
+  --methods zero random knn \
+  --shots 3 --runs 10 --resume
 ```
 
-Zero-shot, Random few-shot, and visual-kNN few-shot prompting do not use category descriptions or boundary-aware category rules. Outputs that cannot be parsed into one of the candidate labels are not retried and are counted as incorrect predictions.
+Zero-shot、Random few-shot 和 visual-kNN few-shot 不使用类别描述或边界规则。解析器先读取规定 JSON；若格式偏离但输出中只出现一个候选类别，仍按该唯一类别计；否则视为无效输出，不重试并按错误分类计。
 
-The MLLM entry points support `--limit 5` for small-scale checks and `--dry-run` for previewing commands. Do not set `--limit` in formal experiments.
+MLLM 入口支持 `--limit 5` 做小规模检查，支持 `--dry-run` 查看命令。正式实验不要设置 `--limit`。
 
-A unified AutoDL entry point is also provided. For example:
+AutoDL 上可用以下脚本准备模型环境和做单次检查；论文表格仍由 `run_mllm_paper_runs.py` 产生：
 
 ```bash
 MODEL_ALIAS=internvl35_14b \
@@ -167,13 +174,13 @@ REMOTECLIP_CHECKPOINT=/path/to/RemoteCLIP-ViT-B-32.pt \
 bash ./run_open_mllm_eval100_autodl.sh
 ```
 
-## 🖼️ 7. Running the Conventional Few-Shot Baselines
+## 🖼️ 7. 运行传统 Few-Shot 基线
 
-For each target image and each visual model, the corresponding frozen ImageNet-pretrained backbone is used to retrieve the `k_cls` most similar support images independently from every class. The resulting target-specific training set contains `k_cls × C` labeled images.
+对于每个目标图像，代码使用冻结的 RemoteCLIP 从 support pool 的每个类别分别检索最相似的 `k_cls` 张图像。相同的目标专属类平衡训练集供四个冻结 ImageNet 骨干使用，大小为 `k_cls × C`。
 
-The training configuration is as follows: only the newly initialized classification head is optimized for 10 epochs using a batch size of 16, Adam with a learning rate of 0.001, cross-entropy loss, an input size of 224×224, and random seed 42.
+训练设置为：只优化新分类头，10 epochs，batch size 16，Adam，学习率 0.001，交叉熵损失，输入尺寸 224×224。正式入口运行十个独立训练种子（默认 42–51）并分别聚合 Accuracy、macro Precision、macro Recall 和 macro F1。
 
-On the first run, generate model-specific retrieval files and execute the experiments:
+首次运行时生成共享的 RemoteCLIP 检索文件并完成十次实验：
 
 ```bash
 python run_all_per_class_fewshot.py \
@@ -182,7 +189,7 @@ python run_all_per_class_fewshot.py \
   --models resnet18 resnet50 vit_tiny vit_small
 ```
 
-To generate only the model-specific, class-wise kNN files:
+只生成逐类 RemoteCLIP kNN 文件：
 
 ```bash
 python run_all_per_class_fewshot.py \
@@ -191,31 +198,31 @@ python run_all_per_class_fewshot.py \
   --examples-only
 ```
 
-Use `--skip-examples` only when retrieval files for the same manifest, model, and shot configuration have already been generated locally.
+仅当本机已经生成相同 manifest、模型和 shot 对应的检索文件时，才可使用 `--skip-examples`。
 
-## ⚙️ 8. Running the Full-Data Baselines
+## ⚙️ 8. 运行 Full-Data 基线
 
-The full-data experiments use seed 42. Each ImageNet-pretrained backbone remains frozen, and only a newly initialized classification head is trained:
+Full-data 的开发划分固定使用 seed 42；最终完整 support 训练默认使用 seeds 42–51。每个 ImageNet 预训练骨干保持冻结，只训练新初始化的分类头：
 
-1. Split the support pool into 90% internal training data and 10% validation data to determine the training configuration.
-2. Reinitialize the classification head and train it on the complete support pool for a fixed 10 epochs.
-3. Evaluate only the epoch-10 model once on the fixed test set.
+1. 将 support pool 按 90%/10% 划分为内部训练集和验证集，用于确定训练配置。
+2. 重新初始化分类头，在完整 support pool 上训练固定 10 epochs。
+3. 每个种子只使用第 10 轮模型在固定测试集评估一次，再对十次结果取算术平均。
 
 ```bash
 python run_full_data_fixed_eval_all.py
 ```
 
-The test set is never used for internal validation, learning-rate adjustment, or model selection. More detailed implementation parameters and any differences from the manuscript description are documented in `MANUSCRIPT_CODE_CONSISTENCY.md`.
+测试集始终不参与内部验证、学习率调整或模型选择。更完整的实现参数及论文披露差异见 `MANUSCRIPT_CODE_CONSISTENCY.md`。
 
-## ✨ 9. Running RS-ViSemDS
+## ✨ 9. 运行 RS-ViSemDS
 
-The main experiments use the following fixed configuration:
+论文主实验使用以下固定配置：
 
-- RemoteCLIP image and text encoders.
-- Number of candidates per class: `r=3`.
-- Total number of final demonstrations: `k=3`.
-- Scoring weights: `(alpha, beta, gamma)=(0.6, 0.2, 0.2)`.
-- Two-stage prompt mode used in the paper appendix: `manuscript_v1`.
+- RemoteCLIP 图像与文本编码器。
+- 每类候选数 `r=3`。
+- 最终示例总数 `k=3`。
+- 评分权重 `(alpha, beta, gamma)=(0.6, 0.2, 0.2)`。
+- 论文附录两阶段提示模式 `manuscript_v1`。
 
 ```bash
 python RS-ViSemDS/run_rs_visemds_all.py \
@@ -227,14 +234,15 @@ python RS-ViSemDS/run_rs_visemds_all.py \
   --r 3 --k 3 \
   --alpha 0.6 --beta 0.2 --gamma 0.2 \
   --prompt-mode manuscript_v1 \
+  --runs 10 \
   --remoteclip-checkpoint /path/to/RemoteCLIP-ViT-B-32.pt
 ```
 
-See `RS-ViSemDS/README.md` for details on the algorithm, scoring procedure, category text, prompt construction, runtime measurement, and single-model execution. Other prompt modes and weight configurations are intended only for auxiliary analysis or ablation studies and should not be mixed with the main experimental setting reported in the paper.
+算法、评分、类别文本、提示构造、时间统计和单模型运行方式见 `RS-ViSemDS/README.md`。其他 prompt mode 和权重设置仅用于辅助分析或消融，不应与论文主实验混用。
 
-## ✅ 10. Verifying the Package
+## ✅ 10. 校验代码包
 
-Before adding the raw datasets:
+原始数据尚未放入时：
 
 ```bash
 python verify_package.py
@@ -242,10 +250,10 @@ python -m unittest discover -s tests -v
 python -m unittest discover -s RS-ViSemDS/tests -v
 ```
 
-After adding the raw datasets:
+放入原始数据后：
 
 ```bash
 python verify_package.py --allow-data
 ```
 
-The verifier checks the number of fixed test images per class, support/test leakage, required entry points, file hashes, and whether the package accidentally contains experimental results, logs, caches, model weights, archives, or pre-generated demonstrations.
+校验器会检查固定测试集的每类数量、support/test 泄漏、必要入口、文件哈希，以及包内是否意外包含结果、日志、缓存、权重、压缩包或预生成示例。

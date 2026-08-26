@@ -1,0 +1,11 @@
+Task Instruction: Use the randomly sampled labeled images below as visual reference examples to classify the target image.
+
+Randomly Sampled Demonstrations:
+[Example image 1]
+Labeled example 1/K. Ground-truth label: <EXAMPLE_1_LABEL>
+...
+[Example image K]
+Labeled example K/K. Ground-truth label: <EXAMPLE_K_LABEL>
+
+Target Input: [Target image]
+Query: Classify the target image into exactly one candidate class.

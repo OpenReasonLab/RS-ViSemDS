@@ -33,7 +33,10 @@ ALLOWED_PDFS = {
     Path("assets/fig02_datasets_models_baseline_protocols.pdf"),
     Path("assets/fig03_rs_visemds_framework.pdf"),
 }
+IGNORED_TOP_LEVEL_NAMES = {".git"}
 REQUIRED_LAUNCHERS = (
+    "run_mllm_paper_runs.py",
+    "aggregate_paper_runs.py",
     "run_gpt4o_aid_nwpu_all.py",
     "run_llama32_11b_aid_nwpu_all.py",
     "run_gemma3_12b_aid_nwpu_all.py",
@@ -42,7 +45,6 @@ REQUIRED_LAUNCHERS = (
     "run_internvl35_8b_aid_nwpu_all.py",
     "run_internvl35_14b_aid_nwpu_all.py",
     "run_open_mllm_eval100_autodl.sh",
-    "build_backbone_knn_examples.py",
     "run_all_per_class_fewshot.py",
     "run_full_data_fixed_eval_all.py",
     "RS-ViSemDS/run_rs_visemds_all.py",
@@ -54,9 +56,15 @@ REQUIRED_PUBLIC_FILES = (
     "LICENSE",
     "GITHUB_UPLOAD_CHECKLIST.md",
     "PACKAGE_CONTENTS.md",
+    "PAPER_REPRODUCTION.md",
     "MANUSCRIPT_CODE_CONSISTENCY.md",
     "SEEDS_AND_DATASETS.md",
     "requirements.txt",
+    "prompts/README.md",
+    "prompts/shared_system.txt",
+    "prompts/zero_shot_paper_v1.txt",
+    "prompts/random_fewshot_paper_v1.txt",
+    "prompts/knn_fewshot_paper_v1.txt",
     "data_raw/AID_dataset/.gitkeep",
     "data_raw/NWPU-RESISC45/.gitkeep",
 )
@@ -80,7 +88,9 @@ def validate_payload_hashes() -> None:
     actual = {
         path.relative_to(ROOT).as_posix()
         for path in ROOT.rglob("*")
-        if path.is_file() and path != list_path
+        if path.is_file()
+        and path != list_path
+        and path.relative_to(ROOT).parts[0] not in IGNORED_TOP_LEVEL_NAMES
     }
     if listed != actual:
         raise ValueError(
@@ -131,7 +141,9 @@ def main() -> None:
     banned_dirs = [
         path.relative_to(ROOT)
         for path in ROOT.rglob("*")
-        if path.is_dir() and path.name.lower() in BANNED_DIRECTORY_NAMES
+        if path.is_dir()
+        and path.relative_to(ROOT).parts[0] not in IGNORED_TOP_LEVEL_NAMES
+        and path.name.lower() in BANNED_DIRECTORY_NAMES
     ]
     if banned_dirs:
         raise ValueError(f"Output/cache directories are packaged: {banned_dirs[:10]}")
@@ -140,6 +152,7 @@ def main() -> None:
         path.relative_to(ROOT)
         for path in ROOT.rglob("*")
         if path.is_file()
+        and path.relative_to(ROOT).parts[0] not in IGNORED_TOP_LEVEL_NAMES
         and path.suffix.lower() in BANNED_SUFFIXES
         and "data_raw" not in path.parts
         and path.relative_to(ROOT) not in ALLOWED_PDFS

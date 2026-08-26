@@ -25,13 +25,14 @@ Observe the licenses and citation requirements shown on the official pages.
 | Component | Seed(s) | Meaning |
 |---|---:|---|
 | Fixed eval100 manifest | 42 | Selects exactly 100 evaluation images per class. |
-| MLLM random demonstrations | 42 | Samples support examples for 1/3/5/10-shot Random prompts. |
+| MLLM random demonstrations | 42–51 | Independently resamples support examples in each of the ten formal runs. |
 | MLLM RemoteCLIP kNN | deterministic | Ranking is derived from the fixed support pool and frozen RemoteCLIP embeddings. |
 | MLLM generation | deterministic decoding | Temperature is 0.0; local Transformers generation uses `do_sample=False`. |
 | Metrics bootstrap | 42 | Uses 10,000 bootstrap samples for the accuracy confidence interval. |
-| Traditional few-shot | 42 | Base training seed; the runner derives stable model/target-specific seeds from it. |
-| Full-data baselines | 42 | Manuscript run; maximum/final training epoch is 10. |
-| RS-ViSemDS selection | deterministic | Uses the seed-42 manifest and deterministic RemoteCLIP visual-semantic ranking. |
+| Traditional few-shot | 42–51 | Ten independent head-training runs; RemoteCLIP retrieval is fixed for a target/manifest. |
+| Full-data development | 42 | One support-only 90/10 split used to fix the training schedule. |
+| Full-data final runs | 42–51 | Ten independent full-support head initializations; final epoch is 10. |
+| RS-ViSemDS selection | deterministic per fixed input | Uses the seed-42 manifest and deterministic RemoteCLIP visual-semantic ranking. |
 | RS-ViSemDS metrics bootstrap | 42 | Uses 10,000 bootstrap samples. |
 
 ## Fixed split sizes

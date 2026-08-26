@@ -1,152 +1,70 @@
-# RS-ViSemDS
+# RS-ViSemDS paper implementation
 
-This directory is an isolated implementation plan and runnable scaffold for the paper's
-Remote Sensing Visual-Semantic Demonstration Selection framework. It does not modify the
-existing zero-shot, random few-shot, global-kNN, Skill Prompt, or traditional visual baselines.
+This directory implements the final method described in the accompanying paper.
+The retrieval encoder and MLLM remain frozen; the test label is introduced only
+after retrieval, prompt construction, and inference.
 
-## 1. Fixed experimental contract
+## Implemented protocol
 
-Use only the formal manifests below:
+- RemoteCLIP image/text embeddings are L2 normalized.
+- Each class prototype is the renormalized mean of ten normalized descriptions.
+- The candidate pool contains the top `r=3` visual neighbors from every class.
+- Candidate image, typicality, and semantic scores are min-max normalized inside
+  the current `r*C` pool.
+- Visual class evidence is a stable temperature-scaled log-mean-exp over the
+  complete class support set. The top-r pool is not used for this evidence.
+- Semantic class evidence is target/prototype cosine similarity divided by its
+  separately calibrated temperature.
+- Both evidence distributions use softmax. Concentration, normalized JSD, and
+  the log-odds update implement equations (9)-(13).
+- The typicality weight remains fixed at `beta0=0.2`; the main base prior is
+  `(0.6, 0.2, 0.2)`.
+- The final demonstrations are the pure global Top-3. There is no visual anchor
+  and no final class-balance constraint.
+- Formal prompts use all boundary-aware category rules, a real system role, and
+  the Appendix-B ordering.
+- Greedy decoding uses `bfloat16`, `device_map=auto`, `do_sample=False`, and
+  `max_new_tokens=256`.
+- A response that cannot be uniquely matched to one candidate label is retained
+  and counted as incorrect; it is not regenerated on resume.
 
-- `manifests/aid_eval100_seed42`: 10 classes, 1000 evaluation images, 2210 support images.
-- `manifests/nwpu_eval100_seed42`: 8 classes, 800 evaluation images, 4800 support images.
+## Support-only temperature calibration
 
-The older 240-image AID and 192-image NWPU manifests and example CSVs are not valid for the
-paper's final tables. Test images are used only for final inference. They must never enter the
-support pool, category-text development, boundary-rule development, or hyperparameter tuning.
+`run_rs_visemds.py` deterministically samples a class-balanced calibration subset
+from the support pool (seed 42 by default) and fits `T_vis` and `T_sem` separately
+by multiclass negative log likelihood. Every held-out support query is excluded
+from its own visual reference set. The chosen indices, temperatures, objective
+values, search bounds, and elapsed time are stored in `run_config.json`.
 
-## 2. Code map
+The paper specifies support-only stratified calibration but does not state its
+optimization objective or subset size. This repository therefore makes those
+choices explicit and configurable instead of silently fixing undocumented values.
 
-- `rs_visemds/category_texts.py`: ten short positive descriptions per class plus separate
-  boundary-aware rules. Freeze this file before the final run.
-- `rs_visemds/embedding_backend.py`: RemoteCLIP image/text encoding, normalized category
-  prototype construction, cache hashes, and manifest-aware cache invalidation.
-- `rs_visemds/selector.py`: class-balanced top-r candidate retrieval, three-component scoring,
-  candidate-pool min-max normalization, and deterministic final top-k selection.
-- `build_rs_visemds_examples.py`: writes selected examples and a complete candidate-score audit.
-- `rs_visemds/prompt_builder.py`: paper-aligned sequential multimodal prompt construction.
-- `run_rs_visemds_mllm.py`: frozen local MLLM inference, resume protection, parsing, metrics,
-  confusion matrices, and timing.
-- `run_rs_visemds_all.py`: main AID/NWPU and Gemma/Qwen/InternVL batch runner.
+The main prior `(0.6, 0.2, 0.2)` is the fixed value reported by the paper and is
+never selected or revised with test images. The manuscript does not disclose an
+objective for re-estimating this prior, so the reproduction code does not invent
+one.
 
-## 3. Algorithm implemented
+## Formal runs
 
-For each category, encode and L2-normalize ten short descriptions. Average the ten vectors and
-normalize the mean to obtain the category prototype. For each target, retrieve the visually
-nearest `r=3` support images independently from every class. This creates 30 AID candidates or
-24 NWPU-Urban candidates.
-
-For candidate `i` with label `y_i`, compute:
-
-```text
-S_img = cos(target_image, candidate_image)
-S_typ = cos(candidate_image, category_prototype[y_i])
-S_sem = cos(target_image, category_prototype[y_i])
-```
-
-Normalize each component independently over the complete `r*C` candidate pool, then compute:
-
-```text
-R = alpha*S_img_norm + beta*S_typ_norm + gamma*S_sem_norm
-alpha = 0.6, beta = 0.2, gamma = 0.2
-```
-
-These `(0.6, 0.2, 0.2)` weights are the paper's main setting and are also the code defaults. The main runner passes them explicitly to the builder. Uniform `(1/3, 1/3, 1/3)` weighting is not the main experiment and must be treated as a separate ablation.
-
-Select the overall top `k=3` candidates. The final list is not forced to be class-balanced and
-may contain repeated labels. Demonstrations are ordered by descending `R` in the prompt.
-
-## 4. Build selections
-
-Run from the parent project root:
+For the paper's required ten repeated runs, use the suite entry point from the
+repository root:
 
 ```bash
-python RS-ViSemDS/build_rs_visemds_examples.py \
-  --dataset aid \
-  --manifest-dir manifests/aid_eval100_seed42 \
-  --out-dir RS-ViSemDS/examples/aid_eval100_seed42_a0p6_b0p2_g0p2 \
-  --r 3 --k 3 \
-  --alpha 0.6 --beta 0.2 --gamma 0.2 \
-  --remoteclip-cache checkpoints
-
-python RS-ViSemDS/build_rs_visemds_examples.py \
-  --dataset nwpu_fg_urban \
-  --manifest-dir manifests/nwpu_eval100_seed42 \
-  --out-dir RS-ViSemDS/examples/nwpu_fg_urban_eval100_seed42_a0p6_b0p2_g0p2 \
-  --r 3 --k 3 \
-  --alpha 0.6 --beta 0.2 --gamma 0.2 \
-  --remoteclip-cache checkpoints
+python RS-ViSemDS/run_rs_visemds_all.py --runs 10
 ```
 
-Each output directory contains:
+Replace `--model-id` with the exact Gemma-3-12B or InternVL3.5-14B checkpoint
+used by the experiment. Existing results produced by the former gate/anchor
+implementation are historical artifacts and must not be mixed with `paper_v1`
+results.
 
-- `examples_rs_visemds_shot_3.csv`: final three demonstrations per target.
-- `candidate_scores.csv`: all `r*C` candidates and every raw/normalized score.
-- `selection_config.json`: weights, hashes, checkpoint identity, and cache metadata.
-
-## 5. Run one model
+## Verification
 
 ```bash
-python RS-ViSemDS/run_rs_visemds_mllm.py \
-  --dataset nwpu_fg_urban \
-  --manifest-dir manifests/nwpu_eval100_seed42 \
-  --selected-examples-csv RS-ViSemDS/examples/nwpu_fg_urban_eval100_seed42_a0p6_b0p2_g0p2/examples_rs_visemds_shot_3.csv \
-  --model /root/autodl-tmp/models/Qwen3-VL-8B \
-  --out-dir RS-ViSemDS/results_eval100_seed42/qwen3vl_8b_nwpu_fg_urban \
-  --torch-dtype bfloat16 --device-map auto --max-tokens 256 \
-  --prompt-mode manuscript_v1 --resume
+python -m unittest discover -s RS-ViSemDS/tests -t RS-ViSemDS -v
 ```
 
-The runner reuses the parent project's `TransformersVisionLLM` and prediction parser. This is
-intentional: changing the parser only for RS-ViSemDS would make comparisons with existing
-zero/random/kNN baselines unfair.
-
-## 6. Run the paper's main suite
-
-```bash
-python RS-ViSemDS/run_rs_visemds_all.py \
-  --datasets aid nwpu_fg_urban \
-  --models gemma3_12b qwen3vl_8b internvl35_14b \
-  --alpha 0.6 --beta 0.2 --gamma 0.2 \
-  --prompt-mode manuscript_v1
-```
-
-Selections are stored in weight-tagged directories such as `a0p6_b0p2_g0p2`, and result paths additionally include the prompt mode. The manuscript main suite explicitly uses `manuscript_v1`; the legacy and fallback modes are auxiliary analyses. Before reusing an existing selection, the runner verifies `selection_config.json`, all three weights, `r`, `k`, the selected CSV hash, and all manifest hashes. A stale uniform-weight selection therefore cannot be silently reused as a paper-main result.
-
-Use `--dry-run` to inspect commands and `--limit 8` for a small inference smoke test. A selection
-smoke test can use `build_rs_visemds_examples.py --limit-per-class 1` in a separate output folder.
-
-## 7. Verification
-
-```bash
-python -m unittest discover -s RS-ViSemDS/tests -v
-python -m py_compile RS-ViSemDS/build_rs_visemds_examples.py \
-  RS-ViSemDS/run_rs_visemds_mllm.py RS-ViSemDS/run_rs_visemds_all.py
-```
-
-Before final experiments, visually inspect selected examples for several targets from every
-class and archive the exact category-text file, RemoteCLIP checkpoint hash, manifests, selection
-CSVs, and run configurations.
-
-## 8. Timing interpretation
-
-Support-image and category-prototype embedding construction is a one-time cached preprocessing
-stage. Per-target results separately record selection, generation, and combined time. Do not
-silently merge one-time cache construction into per-image inference time; state the convention
-used in the paper table.
-
-## 9. AutoDL and ablation scripts
-
-The `run_*_autodl.sh` scripts locate the project root from their own file location, so they may
-be called from any working directory. Override `PROJECT_ROOT`, `PYTHON_BIN`, model-path variables,
-or `REMOTECLIP_CHECKPOINT` when the AutoDL layout differs from the defaults. The default
-RemoteCLIP path is `checkpoints/RemoteCLIP-ViT-B-32.pt` under the project root.
-
-The fallback prompt scripts intentionally reuse frozen selections rather than rebuilding them:
-
-- Run `run_aid_three_classes_v3_autodl.sh` before the AID reference-only/fallback scripts.
-- Run `run_nwpu_prompt_ablation_602020_autodl.sh` before the NWPU fallback scripts.
-
-These scripts are auxiliary ablations. The paper's main experiment remains
-`run_rs_visemds_all.py` with `(alpha, beta, gamma)=(0.6, 0.2, 0.2)` and
-`prompt_mode=manuscript_v1`.
+The tests explicitly cover equations (7)-(15), support-query exclusion,
+temperature calibration, pure global Top-k selection, prompt structure, label
+isolation, and invalid-output accounting.

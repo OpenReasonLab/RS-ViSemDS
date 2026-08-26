@@ -1,0 +1,36 @@
+# Raw datasets and archives
+data_raw/**
+!data_raw/AID_dataset/
+!data_raw/NWPU-RESISC45/
+!data_raw/AID_dataset/.gitkeep
+!data_raw/NWPU-RESISC45/.gitkeep
+*.zip
+*.tar
+*.tar.gz
+
+# Model weights and feature caches
+checkpoints/
+models/
+RemoteCLIP/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# Generated experiment artifacts
+examples/
+results*/
+logs*/
+RS-ViSemDS/examples/
+RS-ViSemDS/results*/
+RS-ViSemDS/ablations/
+cache/
+archive/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.log
+
+# Secrets and local environments
+.env
+.venv/

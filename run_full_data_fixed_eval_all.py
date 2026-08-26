@@ -29,12 +29,11 @@ def parse_args() -> argparse.Namespace:
         choices=["resnet18", "resnet50", "vit_tiny", "vit_small"],
         default=["resnet18", "resnet50", "vit_tiny", "vit_small"],
     )
-    parser.add_argument("--seeds", nargs="+", type=int, default=[42])
+    parser.add_argument("--seeds", nargs="+", type=int, default=list(range(42, 52)))
     parser.add_argument("--max-epochs", type=int, choices=[10], default=10)
     parser.add_argument("--validation-ratio", type=float, default=0.10)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--warmup-images", type=int, default=20)
     parser.add_argument("--limit-per-class", type=int, default=0)
@@ -68,8 +67,6 @@ def main() -> None:
             str(args.batch_size),
             "--lr",
             str(args.lr),
-            "--weight-decay",
-            str(args.weight_decay),
             "--num-workers",
             str(args.num_workers),
             "--warmup-images",
