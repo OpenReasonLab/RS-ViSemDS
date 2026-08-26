@@ -42,7 +42,7 @@ Reference manuscript: `2027IEEE顶刊遥感图像分类 (5).pdf`.
 ## Manuscript ambiguities recorded explicitly
 
 - The full-data prose mentions five seeds, while the table and global reporting statement specify ten runs. The formal code follows ten runs (seeds 42–51) and records all per-run results.
-- The traditional few-shot equation can be read as using each backbone for retrieval, while the experiment prose explicitly names RemoteCLIP. The canonical manuscript entry follows the experiment prose; the older backbone-specific builder is retained only as non-paper historical/ablation code.
+- The traditional few-shot equation can be read as using each backbone for retrieval, while the experiment prose explicitly names RemoteCLIP. The canonical manuscript entry follows the experiment prose; the conflicting backbone-specific builder is excluded from the public package.
 - The manuscript requires separate temperature calibration but does not disclose its optimization objective or subset size. The code uses a support-only class-balanced subset and NLL, and records the subset, bounds, objective, and fitted values. It does not claim these missing choices were specified by the manuscript.
 - The category-description generation workflow does not disclose a complete selection objective. The public descriptions are fixed inputs matching the manuscript; no undisclosed generation objective is invented.
 

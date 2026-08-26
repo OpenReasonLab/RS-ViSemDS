@@ -538,7 +538,6 @@ def process_unlabeled_target(
             dataset=dataset,
             class_order=class_order,
             examples=examples,
-            prompt_mode=PROMPT_MODE,
         )
         record["prompt_build_time_seconds"] = time.perf_counter() - prompt_start
 
@@ -711,13 +710,11 @@ def build_run_config(
         "category_rules_sha256": category_rules_sha256(
             DATASETS[args.dataset]["embedding_name"],
             bundle.class_order,
-            PROMPT_MODE,
         ),
         "prompt_template_sha256": prompt_template_sha256(
             DATASETS[args.dataset]["embedding_name"],
             bundle.class_order,
             args.num_demonstrations,
-            PROMPT_MODE,
         ),
         "runner_sha256": sha256_file(PACKAGE_ROOT / "run_rs_visemds.py"),
         "adaptive_module_sha256": sha256_file(

@@ -6,7 +6,7 @@
   <a href="assets/fig03_rs_visemds_framework.pdf">🧩 Figure 3: RS-ViSemDS Framework</a>
 </p>
 
-本仓库提供论文 **RS-ViSemDS** 的实验复现代码。固定评估划分由 seed 42 生成（每类 100 张测试图像）；论文表格中的性能指标均为十次独立运行的算术平均。正式入口和不可混用的历史入口见 `PAPER_REPRODUCTION.md`。
+本仓库提供论文 **RS-ViSemDS** 的实验复现代码。固定评估划分由 seed 42 生成（每类 100 张测试图像）；论文表格中的性能指标均为十次独立运行的算术平均。正式入口见 `PAPER_REPRODUCTION.md`，旧协议和被取代的临时入口不包含在公开代码中。
 
 本代码包仅包含源代码、配置文件、固定数据划分 manifest、测试、运行脚本以及上方两张论文协议图，不包含原始图像、模型权重、RemoteCLIP 缓存、预生成示例、预测结果、指标文件、混淆矩阵、实验结果图表、日志或检查点。运行实验所需的检索文件均由代码在本地生成。
 
@@ -238,7 +238,7 @@ python RS-ViSemDS/run_rs_visemds_all.py \
   --remoteclip-checkpoint /path/to/RemoteCLIP-ViT-B-32.pt
 ```
 
-算法、评分、类别文本、提示构造、时间统计和单模型运行方式见 `RS-ViSemDS/README.md`。其他 prompt mode 和权重设置仅用于辅助分析或消融，不应与论文主实验混用。
+算法、评分、类别文本、提示构造、时间统计和单模型运行方式见 `RS-ViSemDS/README.md`。正式入口锁定论文的 `paper_v1` 提示和自适应权重协议。
 
 ## ✅ 10. 校验代码包
 

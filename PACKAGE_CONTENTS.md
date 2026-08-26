@@ -20,7 +20,8 @@
 - Predictions, metrics, confusion matrices, checkpoints, logs, result plots, and result tables.
 - PDFs other than the two explicitly packaged manuscript protocol/framework figures.
 - API keys, passwords, SSH credentials, and machine-specific environment files.
-- Old 24-images-per-class outputs and all obsolete experiment artifacts. Historical source files, where retained for auditability, are not manuscript entry points.
+- Old 24-images-per-class code and outputs, superseded fixed-weight selectors,
+  fallback-only launch scripts, and all obsolete experiment artifacts.
 
 `PACKAGE_FILE_LIST.txt` inventories every included payload file except itself. The package
 validator rejects generated examples and experiment-result artifacts.

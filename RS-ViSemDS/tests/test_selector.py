@@ -15,9 +15,9 @@ if str(PACKAGE_ROOT) not in sys.path:
 from rs_visemds.category_texts import description_ensembles
 from rs_visemds.selector import (
     ScoredCandidate,
+    class_balanced_candidates,
     min_max_normalize,
     select_adaptive_demonstrations,
-    select_demonstrations,
 )
 
 
@@ -38,8 +38,18 @@ class SelectorTests(unittest.TestCase):
         ])
         labels = ["a", "a", "a", "b", "b", "b"]
         prototypes = np.stack([unit([1.0, 0.0]), unit([0.0, 1.0])])
-        selected, candidates = select_demonstrations(
-            target, support, labels, prototypes, ["a", "b"], r=2, k=2
+        candidate_indices = class_balanced_candidates(
+            target, support, labels, ["a", "b"], r=2
+        )
+        selected, candidates = select_adaptive_demonstrations(
+            target,
+            support,
+            labels,
+            prototypes,
+            ["a", "b"],
+            candidate_indices=candidate_indices,
+            weights=(0.6, 0.2, 0.2),
+            k=2,
         )
         self.assertEqual(len(candidates), 4)
         self.assertEqual(len(selected), 2)
@@ -57,12 +67,15 @@ class SelectorTests(unittest.TestCase):
 
     def test_weights_must_sum_to_one(self):
         with self.assertRaises(ValueError):
-            select_demonstrations(
+            select_adaptive_demonstrations(
                 unit([1.0, 0.0]),
                 np.stack([unit([1.0, 0.0]), unit([0.0, 1.0])]),
                 ["a", "b"],
                 np.stack([unit([1.0, 0.0]), unit([0.0, 1.0])]),
-                ["a", "b"], r=1, k=1, weights=(1.0, 1.0, 1.0),
+                ["a", "b"],
+                candidate_indices=[0, 1],
+                weights=(1.0, 1.0, 1.0),
+                k=1,
             )
 
     def test_adaptive_selection_is_pure_global_top_k(self):

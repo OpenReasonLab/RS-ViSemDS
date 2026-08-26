@@ -11,7 +11,6 @@ from .calibration import TemperatureCalibrationResult, calibrate_temperatures
 from .selector import (
     ScoredCandidate,
     select_adaptive_demonstrations,
-    select_demonstrations,
 )
 
 __all__ = [
@@ -23,6 +22,5 @@ __all__ = [
     "compute_adaptive_weights",
     "evidence_concentration",
     "select_adaptive_demonstrations",
-    "select_demonstrations",
     "softmax_distribution",
 ]

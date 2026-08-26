@@ -55,9 +55,8 @@ python RS-ViSemDS/run_rs_visemds_all.py --runs 10
 ```
 
 Replace `--model-id` with the exact Gemma-3-12B or InternVL3.5-14B checkpoint
-used by the experiment. Existing results produced by the former gate/anchor
-implementation are historical artifacts and must not be mixed with `paper_v1`
-results.
+used by the experiment. The public package contains only the current adaptive
+selector and the locked `paper_v1` inference path.
 
 ## Verification
 
